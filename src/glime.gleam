@@ -20,7 +20,7 @@ pub fn main() {
   connect()
 }
 
-const version = 766
+const version = 767
 
 fn connect() {
   let assert Ok(_server) =

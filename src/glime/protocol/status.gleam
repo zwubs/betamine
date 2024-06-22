@@ -8,7 +8,7 @@ pub fn serialize(protocol_version: Int) {
       #(
         "version",
         object([
-          #("name", string("1.20.6")),
+          #("name", string("1.21.0")),
           #("protocol", int(protocol_version)),
         ]),
       ),
