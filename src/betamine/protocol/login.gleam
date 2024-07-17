@@ -1,7 +1,7 @@
+import betamine/decoder as decode
+import betamine/encoder as encode
 import gleam/bytes_builder
 import gleam/result
-import glime/decoder as decode
-import glime/encoder as encode
 
 pub type LoginRequest {
   LoginRequest(name: String, uuid: Int)

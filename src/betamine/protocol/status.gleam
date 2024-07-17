@@ -1,6 +1,6 @@
+import betamine/encoder as encode
 import gleam/bytes_builder
 import gleam/json.{array, bool, int, object, string}
-import glime/encoder as encode
 
 pub fn serialize(protocol_version: Int) {
   let status =
@@ -35,7 +35,7 @@ pub fn serialize(protocol_version: Int) {
           ),
         ]),
       ),
-      #("description", object([#("text", string("Hello Lindsey!"))])),
+      #("description", object([#("text", string("Hello BetaCraft!"))])),
       #(
         "favicon",
         string(

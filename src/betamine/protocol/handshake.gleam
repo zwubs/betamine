@@ -1,5 +1,5 @@
+import betamine/decoder
 import gleam/result
-import glime/decoder
 
 pub type Handshake {
   Handshake(protocol_version: Int, address: String, port: Int, next_state: Int)

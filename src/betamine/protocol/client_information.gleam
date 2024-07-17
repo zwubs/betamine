@@ -1,5 +1,5 @@
+import betamine/decoder as decode
 import gleam/result
-import glime/decoder as decode
 
 pub type ChatMode {
   Enabled

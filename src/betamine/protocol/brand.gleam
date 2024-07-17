@@ -1,7 +1,7 @@
+import betamine/decoder as decode
+import betamine/encoder as encode
 import gleam/bytes_builder
 import gleam/result
-import glime/decoder as decode
-import glime/encoder as encode
 
 pub type BrandRequest {
   BrandRequest(channel: String, implementation: String)
@@ -14,6 +14,6 @@ pub fn deserialize(bit_array: BitArray) {
 }
 
 pub fn serialize() {
-  encode.string(bytes_builder.new(), "minecraft:brand")
-  |> encode.string("vanilla")
+  encode.identifier(bytes_builder.new(), "minecraft", "brand")
+  |> encode.string("betamine")
 }

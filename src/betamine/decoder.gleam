@@ -102,3 +102,46 @@ pub fn boolean(bit_array: BitArray) {
     _ -> Error(Nil)
   }
 }
+
+pub fn float(bit_array: BitArray) {
+  case bit_array {
+    <<bytes:float-size(32), bit_array:bytes>> -> Ok(#(bytes, bit_array))
+    _ -> Error(Nil)
+  }
+}
+
+pub fn double(bit_array: BitArray) {
+  case bit_array {
+    <<bytes:float-size(64), bit_array:bytes>> -> Ok(#(bytes, bit_array))
+    _ -> Error(Nil)
+  }
+}
+
+type DecodeArrayResult(value, error) =
+  Result(#(List(value), BitArray), error)
+
+type ArrayParser(value, error) =
+  fn(BitArray) -> Result(#(value, BitArray), error)
+
+pub fn array(
+  bit_array: BitArray,
+  parser: ArrayParser(value, Nil),
+  length: Int,
+) -> DecodeArrayResult(value, Nil) {
+  array_elements(bit_array, parser, [], length)
+}
+
+fn array_elements(
+  bit_array: BitArray,
+  parser: ArrayParser(value, error),
+  values: List(value),
+  length: Int,
+) -> DecodeArrayResult(value, error) {
+  case length {
+    l if l < 1 -> Ok(#(values, bit_array))
+    _ -> {
+      use #(value, bit_array) <- try(parser(bit_array))
+      array_elements(bit_array, parser, [value, ..values], length - 1)
+    }
+  }
+}
