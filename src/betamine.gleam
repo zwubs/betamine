@@ -12,6 +12,7 @@ import betamine/protocol/login
 import betamine/protocol/login_play
 import betamine/protocol/ping
 import betamine/protocol/registry
+import betamine/protocol/set_center_chunk
 import betamine/protocol/set_player_position
 import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
@@ -127,6 +128,7 @@ fn connect() {
             let _ = send(connection, login_play.serialize(), 0x2B)
             let _ = send(connection, change_difficulty.serialize(), 0x0B)
             let _ = send(connection, game_event.serialize(), 0x22)
+            let _ = send(connection, set_center_chunk.serialize(), 0x54)
             let _ =
               send(connection, synchronize_player_position.serialize(), 0x40)
             actor.continue(state.Play)
