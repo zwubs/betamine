@@ -11,10 +11,6 @@ pub fn bool(builder: BytesBuilder, bool: Bool) -> BytesBuilder {
   }
 }
 
-pub fn byte(builder: BytesBuilder, byte: Int) -> BytesBuilder {
-  bytes_builder.append(builder, <<byte:int-big-size(8)>>)
-}
-
 pub fn var_int(builder: BytesBuilder, int: Int) -> BytesBuilder {
   bytes_builder.append(builder, signed_encode(int))
 }
@@ -30,6 +26,14 @@ pub fn identifier(
   value: String,
 ) -> BytesBuilder {
   string(builder, namespace <> ":" <> value)
+}
+
+pub fn byte(builder: BytesBuilder, int: Int) -> BytesBuilder {
+  bytes_builder.append(builder, <<int:int-big-size(8)>>)
+}
+
+pub fn short(builder: BytesBuilder, int: Int) -> BytesBuilder {
+  bytes_builder.append(builder, <<int:int-size(16)>>)
 }
 
 pub fn int(builder: BytesBuilder, int: Int) -> BytesBuilder {
@@ -50,6 +54,10 @@ pub fn double(builder: BytesBuilder, float: Float) -> BytesBuilder {
 
 pub fn uuid(builder: BytesBuilder, int: Int) -> BytesBuilder {
   bytes_builder.append(builder, <<int:int-size(128)>>)
+}
+
+pub fn raw(builder: BytesBuilder, bit_array: BitArray) {
+  bytes_builder.append(builder, bit_array)
 }
 
 type Encoder(value) =

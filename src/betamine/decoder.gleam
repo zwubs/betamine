@@ -36,7 +36,17 @@ fn var_int_accumulator(
   }
 }
 
-fn bytes_of_length(bit_array: BitArray, length: Int) -> DecodeResult(BitArray) {
+pub fn ignore(bit_array: BitArray, byte_count: Int) -> DecodeResult(Nil) {
+  case bit_array {
+    <<_:bytes-size(byte_count), bit_array:bytes>> -> Ok(#(Nil, bit_array))
+    _ -> Error(Nil)
+  }
+}
+
+pub fn bytes_of_length(
+  bit_array: BitArray,
+  length: Int,
+) -> DecodeResult(BitArray) {
   case bit_array {
     <<bytes:bytes-size(length), bit_array:bytes>> -> Ok(#(bytes, bit_array))
     _ -> Error(Nil)
@@ -55,9 +65,23 @@ fn string_from_bytes(bytes: BitArray) {
   |> result.replace_error(Nil)
 }
 
+pub fn short(bit_array: BitArray) {
+  case bit_array {
+    <<bytes:int-size(16), bit_array:bytes>> -> Ok(#(bytes, bit_array))
+    _ -> Error(Nil)
+  }
+}
+
 pub fn unsigned_short(bit_array: BitArray) {
   case bit_array {
     <<bytes:int-unsigned-size(16), bit_array:bytes>> -> Ok(#(bytes, bit_array))
+    _ -> Error(Nil)
+  }
+}
+
+pub fn int(bit_array: BitArray) {
+  case bit_array {
+    <<bytes:int-signed-size(32), bit_array:bytes>> -> Ok(#(bytes, bit_array))
     _ -> Error(Nil)
   }
 }

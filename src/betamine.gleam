@@ -2,6 +2,7 @@ import betamine/decoder
 import betamine/encoder
 import betamine/protocol/brand
 import betamine/protocol/change_difficulty
+import betamine/protocol/chunk_data
 import betamine/protocol/client_information
 import betamine/protocol/confirm_teleportation
 import betamine/protocol/feature_flags
@@ -30,6 +31,8 @@ import glisten.{
 }
 
 pub fn main() {
+  // let assert Ok(chunk_packet) = simplifile.read_bits("chunk-packet.bin")
+  // chunk_data.deserialize(chunk_packet)
   connect()
 }
 
@@ -129,6 +132,7 @@ fn connect() {
             let _ = send(connection, change_difficulty.serialize(), 0x0B)
             let _ = send(connection, game_event.serialize(), 0x22)
             let _ = send(connection, set_center_chunk.serialize(), 0x54)
+            let _ = send(connection, chunk_data.serialize(), 0x27)
             let _ =
               send(connection, synchronize_player_position.serialize(), 0x40)
             actor.continue(state.Play)
