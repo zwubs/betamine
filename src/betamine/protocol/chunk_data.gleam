@@ -23,7 +23,7 @@ pub fn serialize() {
     // Bits per entry
     |> encode.byte(0)
     // Palette Length (Single Valued)
-    |> encode.var_int(1)
+    |> encode.var_int(9)
     // Data Array Length
     |> encode.var_int(0)
     // Biomes
