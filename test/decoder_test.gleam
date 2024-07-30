@@ -21,10 +21,14 @@ pub fn decode_var_int_max_test() {
 pub fn decode_var_int_zero_test() {
   decode_var_int(<<0x80, 0x80, 0x80, 0x80, 0x40>>)
   |> should.equal(0)
+  decode_var_int(<<0x00>>)
+  |> should.equal(0)
 }
 
 pub fn decode_var_int_one_test() {
   decode_var_int(<<0x81, 0x00>>)
+  |> should.equal(1)
+  decode_var_int(<<0x01>>)
   |> should.equal(1)
 }
 
