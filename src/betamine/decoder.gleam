@@ -1,4 +1,6 @@
 import gleam/bit_array
+import gleam/int
+import gleam/io
 import gleam/result.{map, try}
 
 type DecodeResult(value) =
@@ -8,28 +10,32 @@ type DecodeResult(value) =
 pub fn bit_size(x: BitArray) -> Int
 
 pub fn var_int(bit_array: BitArray) -> DecodeResult(Int) {
-  use #(accumulated_bits, bit_array) <- result.then(
-    var_int_accumulator(bit_array, <<>>),
-  )
-  let bit_count = bit_size(accumulated_bits)
-  case accumulated_bits {
-    <<int:int-signed-size(bit_count)>> -> {
-      Ok(#(int, bit_array))
-    }
-    _ -> Error(Nil)
+  io.debug(bit_array.inspect(bit_array))
+  use #(int, bit_array) <- result.then(var_int_accumulator(bit_array, 0, 0))
+  let most_significant_bit = int.bitwise_shift_right(int, 31)
+  io.debug("Most Significant Bit: " <> int.to_string(most_significant_bit))
+  case most_significant_bit {
+    1 ->
+      Ok(#({ int.bitwise_exclusive_or(int, 0xFFFFFFFF) + 1 } * -1, bit_array))
+    _ -> Ok(#(int, bit_array))
   }
 }
 
 fn var_int_accumulator(
   bit_array: BitArray,
-  accumulated_bits: BitArray,
-) -> DecodeResult(BitArray) {
+  accumulated_int: Int,
+  iteration: Int,
+) -> DecodeResult(Int) {
   case bit_array {
-    <<most_significant_bit:int-size(1), int_bits:bits-size(7), bit_array:bytes>> -> {
-      let accumulated_bits = bit_array.append(int_bits, accumulated_bits)
+    <<most_significant_bit:int-size(1), int:int-size(7), bit_array:bytes>> -> {
+      let accumulated_int =
+        int.bitwise_or(
+          accumulated_int,
+          int.bitwise_shift_left(int, 7 * iteration),
+        )
       case most_significant_bit {
-        1 -> var_int_accumulator(bit_array, accumulated_bits)
-        _ -> Ok(#(accumulated_bits, bit_array))
+        1 -> var_int_accumulator(bit_array, accumulated_int, iteration + 1)
+        _ -> Ok(#(accumulated_int, bit_array))
       }
     }
     _ -> Error(Nil)
