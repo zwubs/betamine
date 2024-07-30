@@ -18,6 +18,11 @@ pub fn decode_var_int_max_test() {
   |> should.equal(2_147_483_647)
 }
 
+pub fn decode_var_int_zero_test() {
+  decode_var_int(<<0x80, 0x80, 0x80, 0x80, 0x40>>)
+  |> should.equal(0)
+}
+
 pub fn decode_var_int_one_test() {
   decode_var_int(<<0x81, 0x00>>)
   |> should.equal(1)

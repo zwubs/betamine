@@ -9,15 +9,21 @@ type DecodeResult(value) =
 @external(erlang, "erlang", "bit_size")
 pub fn bit_size(x: BitArray) -> Int
 
+const int32_mask = 0xFFFFFFFF
+
 pub fn var_int(bit_array: BitArray) -> DecodeResult(Int) {
   io.debug(bit_array.inspect(bit_array))
   use #(int, bit_array) <- result.then(var_int_accumulator(bit_array, 0, 0))
-  let most_significant_bit = int.bitwise_shift_right(int, 31)
+  let clamped_int = int.bitwise_and(int32_mask, int)
+  let most_significant_bit = int.bitwise_shift_right(clamped_int, 31)
   io.debug("Most Significant Bit: " <> int.to_string(most_significant_bit))
   case most_significant_bit {
     1 ->
-      Ok(#({ int.bitwise_exclusive_or(int, 0xFFFFFFFF) + 1 } * -1, bit_array))
-    _ -> Ok(#(int, bit_array))
+      Ok(#(
+        { int.bitwise_exclusive_or(clamped_int, int32_mask) + 1 } * -1,
+        bit_array,
+      ))
+    _ -> Ok(#(clamped_int, bit_array))
   }
 }
 
