@@ -2,16 +2,32 @@ import betamine/encoder
 import gleam/bytes_builder
 import gleeunit/should
 
-pub fn encode_var_int_unsigned_test() {
-  let builder = bytes_builder.new()
-  encoder.var_int(builder, 624_485)
+fn encode_var_int(int: Int) {
+  encoder.var_int(bytes_builder.new(), int)
   |> bytes_builder.to_bit_array
-  |> should.equal(<<0xE5, 0x8E, 0x26>>)
 }
 
-pub fn encode_var_int_signed_test() {
-  let builder = bytes_builder.new()
-  encoder.var_int(builder, -123_456)
-  |> bytes_builder.to_bit_array
-  |> should.equal(<<0xC0, 0xBB, 0x78>>)
+pub fn encode_var_int_min_test() {
+  encode_var_int(-2_147_483_648)
+  |> should.equal(<<0x80, 0x80, 0x80, 0x80, 0x08>>)
+}
+
+pub fn encode_var_int_max_test() {
+  encode_var_int(2_147_483_647)
+  |> should.equal(<<0xFF, 0xFF, 0xFF, 0xFF, 0x07>>)
+}
+
+pub fn encode_var_int_zero_test() {
+  encode_var_int(0)
+  |> should.equal(<<0x00>>)
+}
+
+pub fn encode_var_int_one_test() {
+  encode_var_int(1)
+  |> should.equal(<<0x01>>)
+}
+
+pub fn encode_var_int_negative_one_test() {
+  encode_var_int(-1)
+  |> should.equal(<<0xFF, 0xFF, 0xFF, 0xFF, 0x0F>>)
 }

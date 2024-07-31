@@ -1,8 +1,6 @@
 import gleam/bytes_builder.{type BytesBuilder}
+import gleam/int
 import gleam/string
-
-@external(erlang, "eleb128_ffi", "unsigned_encode")
-pub fn signed_encode(int: Int) -> BitArray
 
 pub fn bool(builder: BytesBuilder, bool: Bool) -> BytesBuilder {
   case bool {
@@ -12,7 +10,22 @@ pub fn bool(builder: BytesBuilder, bool: Bool) -> BytesBuilder {
 }
 
 pub fn var_int(builder: BytesBuilder, int: Int) -> BytesBuilder {
-  bytes_builder.append(builder, signed_encode(int))
+  let clamped_int = int.bitwise_and(int, 0xFFFFFFFF)
+  var_int_accumulator(builder, clamped_int)
+}
+
+fn var_int_accumulator(builder: BytesBuilder, int: Int) {
+  let segment = int.bitwise_and(int, 0b01111111)
+  let int = int.bitwise_shift_right(int, 7)
+  let segment = case int {
+    0 -> segment
+    _ -> int.bitwise_or(segment, 0b10000000)
+  }
+  let builder = bytes_builder.append(builder, <<segment:int-size(8)>>)
+  case int {
+    0 -> builder
+    _ -> var_int_accumulator(builder, int)
+  }
 }
 
 pub fn string(builder: BytesBuilder, string: String) -> BytesBuilder {
