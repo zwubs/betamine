@@ -212,7 +212,6 @@ fn send(connection: Connection(String), builder: BytesBuilder, packet_id: Int) {
   let response_builder =
     bytes_builder.prepend_builder(builder, response_builder)
 
-  let builder_size = bytes_builder.byte_size(response_builder)
   io.debug(
     "Sending Packet w/ State: "
     <> string.inspect(connection.subject)
@@ -220,8 +219,11 @@ fn send(connection: Connection(String), builder: BytesBuilder, packet_id: Int) {
     <> int.to_base16(packet_id),
   )
 
+  let builder_size = bytes_builder.byte_size(response_builder)
+  let size_as_bytes_builder = encoder.var_int(bytes_builder.new(), builder_size)
+
   let response_builder =
-    bytes_builder.prepend(response_builder, encoder.signed_encode(builder_size))
+    bytes_builder.prepend_builder(response_builder, size_as_bytes_builder)
   io.debug(bit_array.inspect(bytes_builder.to_bit_array(response_builder)))
   glisten.send(connection, response_builder)
 }
