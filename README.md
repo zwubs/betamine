@@ -1,6 +1,6 @@
 <div align="center">
   <a href="https://github.com/zwubs/betamine">
-    <img src="https://raw.githubusercontent.com/zwubs/nbeet/main/images/betamine.png" alt="betamine logo" width="128" height="128">
+    <img src="https://raw.githubusercontent.com/zwubs/betamine/main/images/betamine.png" alt="betamine logo" width="128" height="128">
   </a>
 
   <h1 align="center" style="margin-bottom: 0; margin-top: 1rem;">betamine</h1>
