@@ -1,5 +1,5 @@
 name = "betamine"
-version = "1.0.0"
+version = "0.0.1"
 
 # Fill out these fields if you intend to generate HTML documentation or publish
 # your project to the Hex package manager.
@@ -18,7 +18,6 @@ glisten = ">= 3.0.0 and < 4.0.0"
 gleam_erlang = ">= 0.25.0 and < 1.0.0"
 gleam_otp = ">= 0.10.0 and < 1.0.0"
 gleam_json = ">= 1.0.0 and < 2.0.0"
-simplifile = ">= 1.7.0 and < 2.0.0"
 
 [dev-dependencies]
 gleeunit = ">= 1.0.0 and < 2.0.0"

@@ -32,4 +32,3 @@ gleam_otp = { version = ">= 0.10.0 and < 1.0.0" }
 gleam_stdlib = { version = ">= 0.34.0 and < 2.0.0" }
 gleeunit = { version = ">= 1.0.0 and < 2.0.0" }
 glisten = { version = ">= 3.0.0 and < 4.0.0" }
-simplifile = { version = ">= 1.7.0 and < 2.0.0" }
