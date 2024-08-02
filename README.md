@@ -42,7 +42,7 @@ This project is in an extremely alpha phase, so there's a lot that needs to be a
 Also, this project is mostly just for fun, so I have no dates planned for features.
 But, Here's a small breakdown of some of the things that are on my mind for the future:
 
-- Figure Out How The Heck OTP Works (Parallelization)
+- Figure Out How The Heck OTP Works (Concurrency)
 - Chat Support
 - Multiplayer Support
 - Compression
