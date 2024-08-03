@@ -209,7 +209,6 @@ fn connect() {
         }
       },
     )
-    |> glisten.with_pool_size(0)
     |> glisten.serve(25_565)
   io.println("Listening on port: 25565")
 
