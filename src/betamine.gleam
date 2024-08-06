@@ -13,9 +13,11 @@ import betamine/protocol/known_packs
 import betamine/protocol/login
 import betamine/protocol/login_play
 import betamine/protocol/ping
+import betamine/protocol/player_info_update
 import betamine/protocol/registry
 import betamine/protocol/set_center_chunk
 import betamine/protocol/set_player_position
+import betamine/protocol/spawn_entity
 import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
 import betamine/state
@@ -178,6 +180,15 @@ fn connect() {
                 synchronize_player_position.serialize(),
                 0x40,
               )
+            let _ =
+              send(
+                connection,
+                client.state,
+                player_info_update.serialize(),
+                0x3E,
+              )
+            let _ =
+              send(connection, client.state, spawn_entity.serialize(), 0x01)
             actor.continue(Client(state.Play, client.last_keep_alive))
           }
           state.Play, 0 -> {
