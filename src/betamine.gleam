@@ -1,5 +1,6 @@
 import betamine/decoder
 import betamine/encoder
+import betamine/protocol
 import betamine/protocol/brand
 import betamine/protocol/change_difficulty
 import betamine/protocol/chunk_data
@@ -20,7 +21,6 @@ import betamine/protocol/set_player_position
 import betamine/protocol/spawn_entity
 import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
-import betamine/state
 import gleam/bit_array
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/erlang/process
@@ -67,13 +67,13 @@ pub fn serialize_client_bound_packet(
 pub fn now_seconds() -> Int
 
 type Client {
-  Client(state: state.State, last_keep_alive: Int)
+  Client(state: protocol.State, last_keep_alive: Int)
 }
 
 fn connect() {
   let assert Ok(_server) =
     glisten.handler(
-      fn(_connection) { #(Client(state.Handshaking, now_seconds()), None) },
+      fn(_connection) { #(Client(protocol.Handshaking, now_seconds()), None) },
       fn(message, client, connection) {
         let packet = deserialize_server_bound_packet(message)
         io.println("")
@@ -89,7 +89,7 @@ fn connect() {
         let now = now_seconds()
         let offset = now - client.last_keep_alive
         let client = case client.state {
-          state.Play if offset >= 15 -> {
+          protocol.Play if offset >= 15 -> {
             let _ = send(connection, client.state, keep_alive.serialize(), 0x26)
             Client(client.state, now_seconds())
           }
@@ -100,28 +100,30 @@ fn connect() {
         io.debug(bit_array.inspect(packet.data))
 
         case client.state, packet.id {
-          state.Handshaking, 0 -> {
+          protocol.Handshaking, 0 -> {
             let assert Ok(handshake) = handshake.deserialize(packet.data)
             io.debug(handshake)
             case handshake.next_state {
-              1 -> actor.continue(Client(state.Status, client.last_keep_alive))
-              2 -> actor.continue(Client(state.Login, client.last_keep_alive))
+              1 ->
+                actor.continue(Client(protocol.Status, client.last_keep_alive))
+              2 ->
+                actor.continue(Client(protocol.Login, client.last_keep_alive))
               _ -> actor.continue(client)
             }
           }
-          state.Status, 0 -> {
+          protocol.Status, 0 -> {
             let status_response = status.serialize(version)
             let _ = send(connection, client.state, status_response, 0)
             actor.continue(client)
           }
-          state.Status, 1 -> {
+          protocol.Status, 1 -> {
             let assert Ok(ping_request) = ping.deserialize(packet.data)
             let ping_response = ping.serialize(ping_request)
             let _ = send(connection, client.state, ping_response, 1)
             actor.continue(client)
           }
           // Login Request
-          state.Login, 0 -> {
+          protocol.Login, 0 -> {
             let assert Ok(login_request) = login.deserialize(packet.data)
             io.debug(login_request)
             let _ =
@@ -129,11 +131,14 @@ fn connect() {
             actor.continue(client)
           }
           // Login Confirmation
-          state.Login, 3 -> {
-            actor.continue(Client(state.Configuration, client.last_keep_alive))
+          protocol.Login, 3 -> {
+            actor.continue(Client(
+              protocol.Configuration,
+              client.last_keep_alive,
+            ))
           }
           // Client Information
-          state.Configuration, 0 -> {
+          protocol.Configuration, 0 -> {
             let assert Ok(client_information_request) =
               client_information.deserialize(packet.data)
             io.debug(client_information_request)
@@ -144,13 +149,13 @@ fn connect() {
             actor.continue(client)
           }
           // Plugin Channels
-          state.Configuration, 2 -> {
+          protocol.Configuration, 2 -> {
             let assert Ok(brand_request) = brand.deserialize(packet.data)
             io.debug(brand_request)
             let _ = send(connection, client.state, brand.serialize(), 0x01)
             actor.continue(client)
           }
-          state.Configuration, 7 -> {
+          protocol.Configuration, 7 -> {
             let assert Ok(known_packs) = known_packs.deserialize(packet.data)
             io.debug(known_packs)
             // Finish Configuration
@@ -160,7 +165,7 @@ fn connect() {
             actor.continue(client)
           }
           // Acknowledge Finish Configuration
-          state.Configuration, 3 -> {
+          protocol.Configuration, 3 -> {
             let _ = send(connection, client.state, login_play.serialize(), 0x2B)
             let _ =
               send(
@@ -189,21 +194,21 @@ fn connect() {
               )
             let _ =
               send(connection, client.state, spawn_entity.serialize(), 0x01)
-            actor.continue(Client(state.Play, client.last_keep_alive))
+            actor.continue(Client(protocol.Play, client.last_keep_alive))
           }
-          state.Play, 0 -> {
+          protocol.Play, 0 -> {
             let assert Ok(confirm_teleport) =
               confirm_teleportation.deserialize(packet.data)
             io.debug(confirm_teleport)
             actor.continue(client)
           }
-          state.Play, 0x1A -> {
+          protocol.Play, 0x1A -> {
             let assert Ok(player_position) =
               set_player_position.deserialize(packet.data)
             io.debug(player_position)
             actor.continue(client)
           }
-          state.Play, 0x18 -> {
+          protocol.Play, 0x18 -> {
             let assert Ok(keep_alive_id) = keep_alive.deserialize(packet.data)
             io.debug("Keep Alive Id: " <> string.inspect(keep_alive_id))
             actor.continue(client)
@@ -228,7 +233,7 @@ fn connect() {
 
 fn send(
   connection: Connection(String),
-  state: state.State,
+  state: protocol.State,
   builder: BytesBuilder,
   packet_id: Int,
 ) {
