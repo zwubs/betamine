@@ -1,15 +1,16 @@
+import betamine/constants
 import betamine/encoder as encode
 import gleam/bytes_builder
 import gleam/json.{array, bool, int, object, string}
 
-pub fn serialize(protocol_version: Int) {
+pub fn serialize() {
   let status =
     object([
       #(
         "version",
         object([
-          #("name", string("1.21.0")),
-          #("protocol", int(protocol_version)),
+          #("name", string(constants.mc_version_name)),
+          #("protocol", int(constants.mc_version_protocol)),
         ]),
       ),
       #(
