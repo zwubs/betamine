@@ -49,6 +49,7 @@ type State {
     game_subject: Subject(game.Command),
     connection: glisten.Connection(BitArray),
     protocol_state: protocol.State,
+    last_keep_alive: Int,
   )
 }
 
@@ -72,7 +73,13 @@ pub fn start(
         |> process.selecting(subject, function.identity)
 
       actor.Ready(
-        State(subject, game_subject, connection, protocol.Handshaking),
+        State(
+          subject,
+          game_subject,
+          connection,
+          protocol.Handshaking,
+          now_seconds(),
+        ),
         selector,
       )
     },
@@ -113,7 +120,22 @@ fn handle_error(error: Error, state: State) {
   }
 }
 
+@external(erlang, "now_ffi", "now_seconds")
+pub fn now_seconds() -> Int
+
 fn handle_server_bound(id: Int, data: BitArray, state: State) {
+  // Logic for handling keep alives
+  // I know I can figure out a way to utilize OTP for this
+  // but I just need something to work for now
+  let offset = now_seconds() - state.last_keep_alive
+  let state = case state.protocol_state {
+    protocol.Play if offset >= 15 -> {
+      let _ = send(state, keep_alive.serialize(), 0x26)
+      State(..state, last_keep_alive: now_seconds())
+    }
+    _ -> state
+  }
+
   case state.protocol_state {
     protocol.Handshaking -> handle_server_bound_handshaking(id, data, state)
     protocol.Status -> handle_server_bound_status(id, data, state)
