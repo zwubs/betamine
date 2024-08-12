@@ -1,7 +1,10 @@
+import betamine/common/player.{type Player, Player}
 import betamine/constants
 import betamine/decoder as decode
 import betamine/encoder as encode
 import betamine/game
+import betamine/game/command
+import betamine/game/update
 import betamine/protocol
 import betamine/protocol/brand
 import betamine/protocol/change_difficulty
@@ -35,6 +38,7 @@ import glisten
 pub type Packet {
   ServerBoundPacket(id: Int, length: Int, data: BitArray)
   ClientBoundPacket(id: Int, length: Int, data: BitArray)
+  GameUpdate(update.Update)
 }
 
 pub fn deserialize_server_bound_packet(bit_array: BitArray) -> Packet {
@@ -45,11 +49,13 @@ pub fn deserialize_server_bound_packet(bit_array: BitArray) -> Packet {
 
 type State {
   State(
-    host_subject: Subject(Packet),
-    game_subject: Subject(game.Command),
+    subject_for_host: Subject(Packet),
+    game_subject: Subject(command.Command),
+    subject_for_game: Subject(update.Update),
     connection: glisten.Connection(BitArray),
     protocol_state: protocol.State,
     last_keep_alive: Int,
+    player: Player,
   )
 }
 
@@ -60,25 +66,30 @@ type Error {
 
 pub fn start(
   host_subject: Subject(Subject(Packet)),
-  game_subject: Subject(game.Command),
+  game_subject: Subject(command.Command),
   connection: glisten.Connection(BitArray),
 ) -> Result(Subject(Packet), actor.StartError) {
   actor.start_spec(actor.Spec(
     init: fn() {
-      let subject = process.new_subject()
-      process.send(host_subject, subject)
+      let subject_for_host = process.new_subject()
+      process.send(host_subject, subject_for_host)
+
+      let subject_for_game = process.new_subject()
 
       let selector =
         process.new_selector()
-        |> process.selecting(subject, function.identity)
+        |> process.selecting(subject_for_host, function.identity)
+        |> process.selecting(subject_for_game, fn(msg) { GameUpdate(msg) })
 
       actor.Ready(
         State(
-          subject,
+          subject_for_host,
           game_subject,
+          subject_for_game,
           connection,
           protocol.Handshaking,
           now_seconds(),
+          Player("", 0, 0),
         ),
         selector,
       )
@@ -92,6 +103,7 @@ fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
   let result = case packet {
     ServerBoundPacket(id, _, data) -> handle_server_bound(id, data, state)
     ClientBoundPacket(id, _, data) -> todo
+    GameUpdate(update) -> handle_game_update(update, state)
   }
   case result {
     Ok(state) -> actor.continue(state)
@@ -182,7 +194,18 @@ fn handle_server_bound_login(id: Int, data: BitArray, state: State) {
       let assert Ok(login_request) = login.deserialize(data)
       io.debug(login_request)
       let _ = send(state, login.serialize(login_request), 2)
-      Ok(state)
+      let player =
+        process.call(
+          state.game_subject,
+          command.SpawnPlayer(
+            state.subject_for_game,
+            _,
+            login_request.uuid,
+            login_request.name,
+          ),
+          1000,
+        )
+      Ok(State(..state, player:))
     }
     0x03 -> {
       Ok(State(..state, protocol_state: protocol.Configuration))
@@ -225,8 +248,8 @@ fn handle_server_bound_configuration(id: Int, data: BitArray, state: State) {
       let _ = send(state, set_center_chunk.serialize(), 0x54)
       let _ = send(state, chunk_data.serialize(), 0x27)
       let _ = send(state, synchronize_player_position.serialize(), 0x40)
-      let _ = send(state, player_info_update.serialize(), 0x3E)
-      let _ = send(state, spawn_entity.serialize(), 0x01)
+      // let _ = send(state, player_info_update.serialize(), 0x3E)
+      // let _ = send(state, spawn_entity.serialize(), 0x01)
       Ok(State(..state, protocol_state: protocol.Play))
     }
     _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
@@ -276,4 +299,20 @@ fn send(state: State, builder: bytes_builder.BytesBuilder, packet_id: Int) {
     bytes_builder.prepend_builder(response_builder, size_as_bytes_builder)
 
   glisten.send(state.connection, response_builder)
+}
+
+fn handle_game_update(update: update.Update, state: State) {
+  case update {
+    update.PlayerSpawned(player, entity) -> {
+      let _ =
+        send(
+          state,
+          player_info_update.serialize(player.uuid, player.name),
+          0x3E,
+        )
+      let _ = send(state, spawn_entity.serialize(entity), 0x01)
+      Ok(state)
+    }
+    _ -> todo
+  }
 }

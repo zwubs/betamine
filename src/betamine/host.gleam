@@ -1,23 +1,23 @@
 import betamine/constants
-import betamine/game
+import betamine/game/command
 import betamine/session
 import gleam/erlang/process.{type Subject}
 import gleam/option.{type Option, None}
 import gleam/otp/actor
 import glisten.{Packet}
 
-pub fn start(game_subject: Subject(game.Command)) {
+pub fn start(game_subject: Subject(command.Command)) {
   start_with_port(game_subject, constants.default_host_port)
 }
 
-pub fn start_with_port(game_subject: Subject(game.Command), port: Int) {
+pub fn start_with_port(game_subject: Subject(command.Command), port: Int) {
   glisten.handler(init(_, game_subject), handler)
   |> glisten.serve(port)
 }
 
 fn init(
   conn,
-  sim_subject: Subject(game.Command),
+  sim_subject: Subject(command.Command),
 ) -> #(Subject(session.Packet), Option(process.Selector(b))) {
   let subject = process.new_subject()
   let assert Ok(_subject) = session.start(subject, sim_subject, conn)
