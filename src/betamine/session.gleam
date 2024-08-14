@@ -1,4 +1,5 @@
 import betamine/common/player.{type Player, Player}
+import betamine/common/position
 import betamine/constants
 import betamine/decoder as decode
 import betamine/encoder as encode
@@ -19,18 +20,26 @@ import betamine/protocol/known_packs
 import betamine/protocol/login
 import betamine/protocol/login_play
 import betamine/protocol/ping
+import betamine/protocol/player_info_remove
 import betamine/protocol/player_info_update
 import betamine/protocol/registry
+import betamine/protocol/remove_entities
 import betamine/protocol/set_center_chunk
+import betamine/protocol/set_head_rotation
 import betamine/protocol/set_player_position
+import betamine/protocol/set_player_position_and_rotation
+import betamine/protocol/set_player_rotation
 import betamine/protocol/spawn_entity
 import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
+import betamine/protocol/update_entity_position
+import betamine/protocol/update_entity_rotation
 import gleam/bytes_builder
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/int
 import gleam/io
+import gleam/list
 import gleam/otp/actor
 import gleam/string
 import glisten
@@ -39,6 +48,7 @@ pub type Packet {
   ServerBoundPacket(id: Int, length: Int, data: BitArray)
   ClientBoundPacket(id: Int, length: Int, data: BitArray)
   GameUpdate(update.Update)
+  Disconnect
 }
 
 pub fn deserialize_server_bound_packet(bit_array: BitArray) -> Packet {
@@ -104,6 +114,13 @@ fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
     ServerBoundPacket(id, _, data) -> handle_server_bound(id, data, state)
     ClientBoundPacket(id, _, data) -> todo
     GameUpdate(update) -> handle_game_update(update, state)
+    Disconnect -> {
+      process.send(
+        state.game_subject,
+        command.RemovePlayer(state.player.uuid, state.subject_for_game),
+      )
+      Ok(state)
+    }
   }
   case result {
     Ok(state) -> actor.continue(state)
@@ -194,18 +211,12 @@ fn handle_server_bound_login(id: Int, data: BitArray, state: State) {
       let assert Ok(login_request) = login.deserialize(data)
       io.debug(login_request)
       let _ = send(state, login.serialize(login_request), 2)
-      let player =
-        process.call(
-          state.game_subject,
-          command.SpawnPlayer(
-            state.subject_for_game,
-            _,
-            login_request.uuid,
-            login_request.name,
-          ),
-          1000,
-        )
-      Ok(State(..state, player:))
+      Ok(
+        State(
+          ..state,
+          player: Player(login_request.name, login_request.uuid, 0),
+        ),
+      )
     }
     0x03 -> {
       Ok(State(..state, protocol_state: protocol.Configuration))
@@ -236,21 +247,49 @@ fn handle_server_bound_configuration(id: Int, data: BitArray, state: State) {
       io.debug(known_packs)
       // Finish Configuration
       registry.send(state.connection)
-      let _ = send(state, registry.serialize(), 7)
+      // let _ = send(state, registry.serialize(), 7)
       let _ = send(state, bytes_builder.new(), 3)
       Ok(state)
     }
     // Acknowledge Finish Configuration
     0x03 -> {
-      let _ = send(state, login_play.serialize(), 0x2B)
+      let #(player, entity) =
+        process.call(
+          state.game_subject,
+          command.SpawnPlayer(
+            state.subject_for_game,
+            _,
+            state.player.uuid,
+            state.player.name,
+          ),
+          1000,
+        )
+      let _ =
+        send(
+          state,
+          login_play.serialize(
+            login_play.Request(
+              ..login_play.default,
+              entity_id: player.entity_id,
+            ),
+          ),
+          0x2B,
+        )
       let _ = send(state, change_difficulty.serialize(), 0x0B)
       let _ = send(state, game_event.serialize(), 0x22)
       let _ = send(state, set_center_chunk.serialize(), 0x54)
       let _ = send(state, chunk_data.serialize(), 0x27)
-      let _ = send(state, synchronize_player_position.serialize(), 0x40)
-      // let _ = send(state, player_info_update.serialize(), 0x3E)
-      // let _ = send(state, spawn_entity.serialize(), 0x01)
-      Ok(State(..state, protocol_state: protocol.Play))
+      let _ = send(state, synchronize_player_position.serialize(entity), 0x40)
+      let players =
+        process.call(state.game_subject, command.GetAllPlayers, 1000)
+      let _ = send(state, player_info_update.serialize(players), 0x3E)
+      let entities =
+        process.call(state.game_subject, command.GetAllEntities, 1000)
+      list.filter(entities, fn(entity) { entity.id != player.entity_id })
+      |> list.map(fn(entity) {
+        send(state, spawn_entity.serialize(entity), 0x01)
+      })
+      Ok(State(..state, protocol_state: protocol.Play, player:))
     }
     _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
   }
@@ -263,14 +302,54 @@ fn handle_server_bound_play(id: Int, data: BitArray, state: State) {
       io.debug(confirm_teleport)
       Ok(state)
     }
-    0x1A -> {
-      let assert Ok(player_position) = set_player_position.deserialize(data)
-      io.debug(player_position)
-      Ok(state)
-    }
     0x18 -> {
       let assert Ok(keep_alive_id) = keep_alive.deserialize(data)
       io.debug("Keep Alive Id: " <> string.inspect(keep_alive_id))
+      Ok(state)
+    }
+    0x1A -> {
+      let assert Ok(player_position) = set_player_position.deserialize(data)
+      process.send(
+        state.game_subject,
+        command.MoveEntity(
+          state.player.entity_id,
+          player_position.position,
+          player_position.on_ground,
+        ),
+      )
+      Ok(state)
+    }
+    0x1B -> {
+      let assert Ok(player_position_and_rotation) =
+        set_player_position_and_rotation.deserialize(data)
+      process.send(
+        state.game_subject,
+        command.MoveEntity(
+          state.player.entity_id,
+          player_position_and_rotation.position,
+          player_position_and_rotation.on_ground,
+        ),
+      )
+      process.send(
+        state.game_subject,
+        command.RotateEntity(
+          state.player.entity_id,
+          player_position_and_rotation.rotation,
+          player_position_and_rotation.on_ground,
+        ),
+      )
+      Ok(state)
+    }
+    0x1C -> {
+      let assert Ok(player_rotation) = set_player_rotation.deserialize(data)
+      process.send(
+        state.game_subject,
+        command.RotateEntity(
+          state.player.entity_id,
+          player_rotation.rotation,
+          player_rotation.on_ground,
+        ),
+      )
       Ok(state)
     }
     _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
@@ -286,7 +365,9 @@ fn send(state: State, builder: bytes_builder.BytesBuilder, packet_id: Int) {
     bytes_builder.prepend_builder(builder, response_builder)
 
   io.println(
-    "Sending Packet w/ State: "
+    "Sending Packet To: "
+    <> state.player.name
+    <> " w/ State: "
     <> string.inspect(state.protocol_state)
     <> " & Id: 0x"
     <> int.to_base16(packet_id),
@@ -304,13 +385,33 @@ fn send(state: State, builder: bytes_builder.BytesBuilder, packet_id: Int) {
 fn handle_game_update(update: update.Update, state: State) {
   case update {
     update.PlayerSpawned(player, entity) -> {
-      let _ =
-        send(
-          state,
-          player_info_update.serialize(player.uuid, player.name),
-          0x3E,
-        )
+      let _ = send(state, player_info_update.serialize([player]), 0x3E)
       let _ = send(state, spawn_entity.serialize(entity), 0x01)
+      io.debug(player)
+      Ok(state)
+    }
+    update.EntityPosition(entity_id, old_position, new_position, on_ground) -> {
+      let request =
+        update_entity_position.UpdateEntityPosition(
+          entity_id,
+          old_position,
+          new_position,
+          on_ground,
+        )
+      let _ = send(state, update_entity_position.serialize(request), 0x2E)
+      Ok(state)
+    }
+    update.EntityRotation(entity_id, rotation, on_ground) -> {
+      let request =
+        update_entity_rotation.Request(entity_id, rotation, on_ground)
+      let _ = send(state, update_entity_rotation.serialize(request), 0x30)
+      let request = set_head_rotation.Request(entity_id, rotation.yaw)
+      let _ = send(state, set_head_rotation.serialize(request), 0x48)
+      Ok(state)
+    }
+    update.PlayerDisconnected(player) -> {
+      let _ = send(state, player_info_remove.serialize([player.uuid]), 0x3D)
+      let _ = send(state, remove_entities.serialize([player.entity_id]), 0x42)
       Ok(state)
     }
     _ -> todo

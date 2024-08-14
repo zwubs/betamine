@@ -36,10 +36,9 @@ pub fn string(builder: BytesBuilder, string: String) -> BytesBuilder {
 
 pub fn identifier(
   builder: BytesBuilder,
-  namespace: String,
-  value: String,
+  identifier: #(String, String),
 ) -> BytesBuilder {
-  string(builder, namespace <> ":" <> value)
+  string(builder, identifier.0 <> ":" <> identifier.1)
 }
 
 pub fn byte(builder: BytesBuilder, int: Int) -> BytesBuilder {

@@ -2,6 +2,7 @@ import betamine/constants
 import betamine/game/command
 import betamine/session
 import gleam/erlang/process.{type Subject}
+import gleam/io
 import gleam/option.{type Option, None}
 import gleam/otp/actor
 import glisten.{Packet}
@@ -12,6 +13,10 @@ pub fn start(game_subject: Subject(command.Command)) {
 
 pub fn start_with_port(game_subject: Subject(command.Command), port: Int) {
   glisten.handler(init(_, game_subject), handler)
+  |> glisten.with_close(fn(subject) {
+    io.debug("Closing Connection.")
+    process.send(subject, session.Disconnect)
+  })
   |> glisten.serve(port)
 }
 

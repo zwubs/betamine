@@ -1,18 +1,19 @@
+import betamine/common/entity.{type Entity}
 import betamine/encoder as encode
 import gleam/bytes_builder
 
-pub fn serialize() {
+pub fn serialize(entity: Entity) {
   bytes_builder.new()
   // X
-  |> encode.double(0.0)
+  |> encode.double(entity.position.x)
   // Y
-  |> encode.double(0.0)
+  |> encode.double(entity.position.y)
   // Z
-  |> encode.double(0.0)
+  |> encode.double(entity.position.z)
   // Yaw
-  |> encode.float(0.0)
+  |> encode.float(entity.rotation.yaw)
   // Pitch
-  |> encode.float(0.0)
+  |> encode.float(entity.rotation.pitch)
   // Flags
   |> encode.byte(0)
   // Teleport Id

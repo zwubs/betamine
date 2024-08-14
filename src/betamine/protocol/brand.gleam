@@ -14,6 +14,6 @@ pub fn deserialize(bit_array: BitArray) {
 }
 
 pub fn serialize() {
-  encode.identifier(bytes_builder.new(), "minecraft", "brand")
+  encode.identifier(bytes_builder.new(), #("minecraft", "brand"))
   |> encode.string("betamine")
 }

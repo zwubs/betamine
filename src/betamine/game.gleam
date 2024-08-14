@@ -2,19 +2,19 @@ import betamine/common/entity.{type Entity}
 import betamine/common/entity_type
 import betamine/common/player.{type Player}
 import betamine/common/position.{Position}
+import betamine/constants
 import betamine/game/command.{type Command}
 import betamine/game/update.{type Update}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/function
+import gleam/io
 import gleam/list
 import gleam/otp/actor
-import gleam/set
 
 type Game {
   Game(
-    sessions: set.Set(Subject(Update)),
-    players: dict.Dict(Int, Player),
+    sessions: dict.Dict(Int, #(Subject(Update), Player)),
     entities: dict.Dict(Int, Entity),
   )
 }
@@ -32,7 +32,7 @@ pub fn start() -> Result(Subject(Command), actor.StartError) {
           process.new_selector()
           |> process.selecting(sim_subject, function.identity)
 
-        actor.Ready(Game(set.new(), dict.new(), dict.new()), selector)
+        actor.Ready(Game(dict.new(), dict.new()), selector)
       },
       init_timeout: 1000,
       loop: loop,
@@ -48,6 +48,16 @@ pub fn start() -> Result(Subject(Command), actor.StartError) {
 
 fn loop(command: Command, game: Game) -> actor.Next(Command, Game) {
   case command {
+    command.GetAllPlayers(subject) -> {
+      let players =
+        dict.values(game.sessions) |> list.map(fn(session) { session.1 })
+      process.send(subject, players)
+      actor.continue(game)
+    }
+    command.GetAllEntities(subject) -> {
+      process.send(subject, dict.values(game.entities))
+      actor.continue(game)
+    }
     command.SpawnPlayer(subject, player_subject, uuid, name) -> {
       let entity =
         entity.Entity(
@@ -55,24 +65,80 @@ fn loop(command: Command, game: Game) -> actor.Next(Command, Game) {
           id: dict.size(game.entities),
           uuid:,
           entity_type: entity_type.Player,
-          position: Position(6.0, -48.0, 6.0),
+          position: constants.mc_player_spawn_point,
         )
       let player = player.Player(name, uuid, entity.id)
-      process.send(player_subject, player)
+      process.send(player_subject, #(player, entity))
       update_sessions(game, update.PlayerSpawned(player, entity))
       actor.continue(Game(
-        sessions: set.insert(game.sessions, subject),
-        players: dict.insert(game.players, player.uuid, player),
+        sessions: dict.insert(game.sessions, player.uuid, #(subject, player)),
         entities: dict.insert(game.entities, entity.id, entity),
       ))
+    }
+    command.MoveEntity(entity_id, new_position, on_ground) -> {
+      let entity = case dict.get(game.entities, entity_id) {
+        Ok(entity) -> {
+          let old_position = entity.position
+          let entity = case position.equal(old_position, new_position) {
+            True -> entity
+            False -> {
+              io.debug(new_position)
+              update_sessions(
+                game,
+                update.EntityPosition(
+                  entity.id,
+                  old_position,
+                  new_position,
+                  on_ground,
+                ),
+              )
+              entity.Entity(..entity, position: new_position)
+            }
+          }
+          entity
+        }
+        Error(_) -> todo
+      }
+      actor.continue(
+        Game(..game, entities: dict.insert(game.entities, entity.id, entity)),
+      )
+    }
+    command.RotateEntity(entity_id, rotation, on_ground) -> {
+      let entity = case dict.get(game.entities, entity_id) {
+        Ok(entity) -> {
+          update_sessions(
+            game,
+            update.EntityRotation(entity.id, rotation, on_ground),
+          )
+          entity.Entity(..entity, rotation:)
+        }
+        Error(_) -> todo
+      }
+      actor.continue(
+        Game(..game, entities: dict.insert(game.entities, entity.id, entity)),
+      )
+    }
+    command.RemovePlayer(uuid, subject) -> {
+      let session = dict.get(game.sessions, uuid)
+      let game = case session {
+        Error(_) -> game
+        Ok(#(_subject, player)) -> {
+          update_sessions(game, update.PlayerDisconnected(player))
+          Game(
+            sessions: dict.delete(game.sessions, uuid),
+            entities: dict.delete(game.entities, player.entity_id),
+          )
+        }
+      }
+
+      actor.continue(game)
     }
     _ -> actor.continue(game)
   }
 }
 
-fn update_sessions(game: Game, update: update.Update) -> Game {
+fn update_sessions(game: Game, update: update.Update) {
   game.sessions
-  |> set.to_list
-  |> list.each(fn(subject) { process.send(subject, update) })
-  game
+  |> dict.values
+  |> list.each(fn(session) { process.send(session.0, update) })
 }
