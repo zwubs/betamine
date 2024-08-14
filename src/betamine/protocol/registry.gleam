@@ -4,7 +4,7 @@ import gleam/io
 import glisten.{type Connection}
 import simplifile
 
-pub fn send(connection: Connection(String)) {
+pub fn send(connection: Connection(BitArray)) {
   let assert Ok(registries) =
     simplifile.read_directory("src/betamine/protocol/registries")
   // io.debug(registries)
@@ -13,14 +13,14 @@ pub fn send(connection: Connection(String)) {
     "armor_trim_pattern_registry.bin", "armor_trim_material_registry.bin",
     "wolf_variant_registry.bin", "painting_variant_registry.bin",
     "dimension_registry.bin", "damage_type_registry.bin",
-    "banner_pattern_registry.bin", "enchantment_registry.bin",
-    "jukebox_registry.bin",
-    // "item_registry.bin",
+    // "banner_pattern_registry.bin", "enchantment_registry.bin",
+  // "jukebox_registry.bin",
+  // "item_registry.bin",
   ])
 }
 
 pub fn send_registry(
-  connection: Connection(String),
+  connection: Connection(BitArray),
   registry_paths: List(String),
 ) {
   case registry_paths {

@@ -1,17 +1,23 @@
+import betamine/common/player.{type Player}
 import betamine/encoder as encode
 import gleam/bytes_builder
+import gleam/list
 
-pub fn serialize() {
+pub fn serialize(players: List(Player)) {
   bytes_builder.new()
   // Action (Add Player)
   |> encode.byte(0b00000001)
   // Player Count
-  |> encode.var_int(1)
-  // Player UUID
-  |> encode.uuid(0x000003e8532721efb600325096b39f47)
-  // Player Actions
-  // Name
-  |> encode.string("NPC")
-  // Properties
-  |> encode.var_int(0)
+  |> encode.var_int(list.length(players))
+  |> list.fold(
+    players,
+    _,
+    fn(builder, player) {
+      builder
+      |> encode.uuid(player.uuid)
+      |> encode.string(player.name)
+      // Properties
+      |> encode.var_int(0)
+    },
+  )
 }

@@ -1,4 +1,5 @@
 import gleam/bytes_builder.{type BytesBuilder}
+import gleam/float
 import gleam/int
 import gleam/string
 
@@ -35,10 +36,9 @@ pub fn string(builder: BytesBuilder, string: String) -> BytesBuilder {
 
 pub fn identifier(
   builder: BytesBuilder,
-  namespace: String,
-  value: String,
+  identifier: #(String, String),
 ) -> BytesBuilder {
-  string(builder, namespace <> ":" <> value)
+  string(builder, identifier.0 <> ":" <> identifier.1)
 }
 
 pub fn byte(builder: BytesBuilder, int: Int) -> BytesBuilder {
@@ -63,6 +63,10 @@ pub fn float(builder: BytesBuilder, float: Float) -> BytesBuilder {
 
 pub fn double(builder: BytesBuilder, float: Float) -> BytesBuilder {
   bytes_builder.append(builder, <<float:float-size(64)>>)
+}
+
+pub fn angle(builder: BytesBuilder, angle: Float) -> BytesBuilder {
+  byte(builder, { angle /. 360.0 *. 256.0 |> float.truncate } % 256)
 }
 
 pub fn uuid(builder: BytesBuilder, int: Int) -> BytesBuilder {
