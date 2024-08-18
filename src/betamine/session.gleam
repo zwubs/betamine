@@ -63,14 +63,14 @@ type State {
     game_subject: Subject(command.Command),
     subject_for_game: Subject(update.Update),
     connection: glisten.Connection(BitArray),
-    protocol_state: protocol.State,
+    protocol_state: protocol.Phase,
     last_keep_alive: Int,
     player: Player,
   )
 }
 
 type Error {
-  UnknownServerBoundPacket(state: protocol.State, id: Int)
+  UnknownServerBoundPacket(state: protocol.Phase, id: Int)
   UnknownProtocolState(state: Int)
 }
 

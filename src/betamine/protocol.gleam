@@ -1,4 +1,4 @@
-pub type State {
+pub type Phase {
   Handshaking
   Status
   Login
