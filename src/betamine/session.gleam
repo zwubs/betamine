@@ -14,11 +14,10 @@ import betamine/protocol/client_information
 import betamine/protocol/confirm_teleportation
 import betamine/protocol/feature_flags
 import betamine/protocol/game_event
-import betamine/protocol/handshake
 import betamine/protocol/keep_alive
 import betamine/protocol/known_packs
-import betamine/protocol/login
 import betamine/protocol/login_play
+import betamine/protocol/phase
 import betamine/protocol/ping
 import betamine/protocol/player_info_remove
 import betamine/protocol/player_info_update
@@ -30,7 +29,6 @@ import betamine/protocol/set_player_position
 import betamine/protocol/set_player_position_and_rotation
 import betamine/protocol/set_player_rotation
 import betamine/protocol/spawn_entity
-import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
 import betamine/protocol/update_entity_position
 import betamine/protocol/update_entity_rotation
@@ -43,18 +41,18 @@ import gleam/list
 import gleam/otp/actor
 import gleam/string
 import glisten
+import protocol/packets/serverbound
+import protocol/packets/serverbound/configuration
+import protocol/packets/serverbound/handshaking
+import protocol/packets/serverbound/login
+import protocol/packets/serverbound/play
+import protocol/packets/serverbound/status
 
 pub type Packet {
-  ServerBoundPacket(id: Int, length: Int, data: BitArray)
+  ServerBoundPacket(data: BitArray)
   ClientBoundPacket(id: Int, length: Int, data: BitArray)
   GameUpdate(update.Update)
   Disconnect
-}
-
-pub fn deserialize_server_bound_packet(bit_array: BitArray) -> Packet {
-  let assert Ok(#(length, bit_array)) = decode.var_int(bit_array)
-  let assert Ok(#(id, bit_array)) = decode.var_int(bit_array)
-  ServerBoundPacket(id, length, bit_array)
 }
 
 type State {
@@ -63,14 +61,14 @@ type State {
     game_subject: Subject(command.Command),
     subject_for_game: Subject(update.Update),
     connection: glisten.Connection(BitArray),
-    protocol_state: protocol.Phase,
+    phase: phase.Phase,
     last_keep_alive: Int,
     player: Player,
   )
 }
 
 type Error {
-  UnknownServerBoundPacket(state: protocol.Phase, id: Int)
+  UnknownServerBoundPacket(state: phase.Phase, id: Int)
   UnknownProtocolState(state: Int)
 }
 
@@ -97,7 +95,7 @@ pub fn start(
           game_subject,
           subject_for_game,
           connection,
-          protocol.Handshaking,
+          phase.Handshaking,
           now_seconds(),
           Player("", 0, 0),
         ),
@@ -111,7 +109,10 @@ pub fn start(
 
 fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
   let result = case packet {
-    ServerBoundPacket(id, _, data) -> handle_server_bound(id, data, state)
+    ServerBoundPacket(data) -> {
+      let assert Ok(packet) = protocol.decode_serverbound(state.phase, data)
+      handle_server_bound(packet, state)
+    }
     ClientBoundPacket(id, _, data) -> todo
     GameUpdate(update) -> handle_game_update(update, state)
     Disconnect -> {
@@ -130,19 +131,18 @@ fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
 
 fn handle_error(error: Error, state: State) {
   case error {
-    UnknownServerBoundPacket(protocol_state, id) -> {
+    UnknownServerBoundPacket(phase, id) -> {
       io.debug(
         "Unhandled Packet w/ State: "
-        <> string.inspect(protocol_state)
+        <> string.inspect(phase)
         <> " & Id: 0x"
         <> int.to_base16(id),
       )
       actor.continue(state)
     }
-    UnknownProtocolState(protocol_state) -> {
+    UnknownProtocolState(phase) -> {
       io.debug(
-        "Client Requested An Unknown Protocol State: "
-        <> string.inspect(protocol_state),
+        "Client Requested An Unknown Protocol State: " <> string.inspect(phase),
       )
       actor.continue(state)
     }
@@ -152,99 +152,83 @@ fn handle_error(error: Error, state: State) {
 @external(erlang, "now_ffi", "now_seconds")
 pub fn now_seconds() -> Int
 
-fn handle_server_bound(id: Int, data: BitArray, state: State) {
+fn handle_server_bound(packet: serverbound.Packet, state: State) {
   // Logic for handling keep alives
   // I know I can figure out a way to utilize OTP for this
   // but I just need something to work for now
   let offset = now_seconds() - state.last_keep_alive
-  let state = case state.protocol_state {
-    protocol.Play if offset >= 15 -> {
+  let state = case state.phase {
+    phase.Play if offset >= 15 -> {
       let _ = send(state, keep_alive.serialize(), 0x26)
       State(..state, last_keep_alive: now_seconds())
     }
     _ -> state
   }
 
-  case state.protocol_state {
-    protocol.Handshaking -> handle_server_bound_handshaking(id, data, state)
-    protocol.Status -> handle_server_bound_status(id, data, state)
-    protocol.Login -> handle_server_bound_login(id, data, state)
-    protocol.Configuration -> handle_server_bound_configuration(id, data, state)
-    protocol.Play -> handle_server_bound_play(id, data, state)
+  case packet {
+    serverbound.Handshaking(packet) ->
+      handle_server_bound_handshaking(packet, state)
+    serverbound.Status(packet) -> handle_server_bound_status(packet, state)
+    serverbound.Login(packet) -> handle_server_bound_login(packet, state)
+    serverbound.Configuration(packet) ->
+      handle_server_bound_configuration(packet, state)
+    serverbound.Play(packet) -> handle_server_bound_play(packet, state)
   }
 }
 
-fn handle_server_bound_handshaking(id: Int, data: BitArray, state: State) {
-  case id {
-    0x00 -> {
-      let assert Ok(handshake) = handshake.deserialize(data)
-      case handshake.next_state {
-        1 -> Ok(State(..state, protocol_state: protocol.Status))
-        2 -> Ok(State(..state, protocol_state: protocol.Login))
-        _ -> Error(UnknownProtocolState(handshake.next_state))
+fn handle_server_bound_handshaking(
+  packet: serverbound.HandshakingPacket,
+  state: State,
+) {
+  case packet {
+    serverbound.Handshake(packet) -> {
+      case packet.next_phase {
+        1 -> Ok(State(..state, phase: phase.Status))
+        2 -> Ok(State(..state, phase: phase.Login))
+        phase -> Error(UnknownProtocolState(phase))
       }
     }
-    _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
   }
 }
 
-fn handle_server_bound_status(id: Int, data: BitArray, state: State) {
-  case id {
-    0x00 -> {
-      let status_response = status.serialize()
-      let _ = send(state, status_response, 0)
+fn handle_server_bound_status(packet: status.Packet, state: State) {
+  case packet {
+    status.StatusRequest -> {
+      // let status_response = status.serialize()
+      // let _ = send(state, status_response, 0)
       Ok(state)
     }
-    0x01 -> {
-      let assert Ok(ping_request) = ping.deserialize(data)
-      let ping_response = ping.serialize(ping_request)
-      let _ = send(state, ping_response, 1)
+    status.Ping(_) -> {
+      // let ping_response = ping.serialize(ping_request)
+      // let _ = send(state, ping_response, 1)
       Ok(state)
     }
-    _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
   }
 }
 
-fn handle_server_bound_login(id: Int, data: BitArray, state: State) {
-  case id {
-    0x00 -> {
-      let assert Ok(login_request) = login.deserialize(data)
-      io.debug(login_request)
-      let _ = send(state, login.serialize(login_request), 2)
-      Ok(
-        State(
-          ..state,
-          player: Player(login_request.name, login_request.uuid, 0),
-        ),
-      )
+fn handle_server_bound_login(packet: login.Packet, state: State) {
+  case packet {
+    login.Login(name, uuid) -> {
+      // let _ = send(state, login.serialize(login_request), 2)
+      Ok(State(..state, player: Player(name, uuid, 0)))
     }
-    0x03 -> {
-      Ok(State(..state, protocol_state: protocol.Configuration))
-    }
-    _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
+    login.Acknowledged -> Ok(State(..state, phase: phase.Configuration))
   }
 }
 
-fn handle_server_bound_configuration(id: Int, data: BitArray, state: State) {
-  case id {
-    0x00 -> {
-      let assert Ok(client_information_request) =
-        client_information.deserialize(data)
-      io.debug(client_information_request)
+fn handle_server_bound_configuration(packet: configuration.Packet, state: State) {
+  case packet {
+    configuration.ClientInformation(_, _, _, _, _, _, _, _) -> {
       let _ = send(state, feature_flags.serialize(), 0x0C)
       let _ = send(state, known_packs.serialize(), 0x0E)
       Ok(state)
     }
     // Plugin Channels
-    0x02 -> {
-      let assert Ok(brand_request) = brand.deserialize(data)
-      io.debug(brand_request)
+    configuration.Plugin(_, _) -> {
       let _ = send(state, brand.serialize(), 0x01)
       Ok(state)
     }
-    0x07 -> {
-      let assert Ok(known_packs) = known_packs.deserialize(data)
-      io.debug(known_packs)
+    configuration.KnownDataPacks(_) -> {
       // Finish Configuration
       registry.send(state.connection)
       // let _ = send(state, registry.serialize(), 7)
@@ -252,7 +236,7 @@ fn handle_server_bound_configuration(id: Int, data: BitArray, state: State) {
       Ok(state)
     }
     // Acknowledge Finish Configuration
-    0x03 -> {
+    configuration.AcknowledgeFinish -> {
       let #(player, entity) =
         process.call(
           state.game_subject,
@@ -289,70 +273,40 @@ fn handle_server_bound_configuration(id: Int, data: BitArray, state: State) {
       |> list.map(fn(entity) {
         send(state, spawn_entity.serialize(entity), 0x01)
       })
-      Ok(State(..state, protocol_state: protocol.Play, player:))
+      Ok(State(..state, phase: phase.Play, player:))
     }
-    _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
   }
 }
 
-fn handle_server_bound_play(id: Int, data: BitArray, state: State) {
-  case id {
-    0x00 -> {
-      let assert Ok(confirm_teleport) = confirm_teleportation.deserialize(data)
-      io.debug(confirm_teleport)
-      Ok(state)
-    }
-    0x18 -> {
-      let assert Ok(keep_alive_id) = keep_alive.deserialize(data)
-      io.debug("Keep Alive Id: " <> string.inspect(keep_alive_id))
-      Ok(state)
-    }
-    0x1A -> {
-      let assert Ok(player_position) = set_player_position.deserialize(data)
+fn handle_server_bound_play(packet: play.Packet, state: State) {
+  case packet {
+    play.ConfirmTeleport(_) -> Ok(state)
+    play.KeepAlive(_) -> Ok(state)
+    play.PlayerPosition(position, on_ground) -> {
       process.send(
         state.game_subject,
-        command.MoveEntity(
-          state.player.entity_id,
-          player_position.position,
-          player_position.on_ground,
-        ),
+        command.MoveEntity(state.player.entity_id, position, on_ground),
       )
       Ok(state)
     }
-    0x1B -> {
-      let assert Ok(player_position_and_rotation) =
-        set_player_position_and_rotation.deserialize(data)
+    play.PlayerPositionAndRotation(position, rotation, on_ground) -> {
       process.send(
         state.game_subject,
-        command.MoveEntity(
-          state.player.entity_id,
-          player_position_and_rotation.position,
-          player_position_and_rotation.on_ground,
-        ),
+        command.MoveEntity(state.player.entity_id, position, on_ground),
       )
       process.send(
         state.game_subject,
-        command.RotateEntity(
-          state.player.entity_id,
-          player_position_and_rotation.rotation,
-          player_position_and_rotation.on_ground,
-        ),
+        command.RotateEntity(state.player.entity_id, rotation, on_ground),
       )
       Ok(state)
     }
-    0x1C -> {
-      let assert Ok(player_rotation) = set_player_rotation.deserialize(data)
+    play.PlayerRotation(rotation, on_ground) -> {
       process.send(
         state.game_subject,
-        command.RotateEntity(
-          state.player.entity_id,
-          player_rotation.rotation,
-          player_rotation.on_ground,
-        ),
+        command.RotateEntity(state.player.entity_id, rotation, on_ground),
       )
       Ok(state)
     }
-    _ -> Error(UnknownServerBoundPacket(state.protocol_state, id))
   }
 }
 
@@ -368,7 +322,7 @@ fn send(state: State, builder: bytes_builder.BytesBuilder, packet_id: Int) {
     "Sending Packet To: "
     <> state.player.name
     <> " w/ State: "
-    <> string.inspect(state.protocol_state)
+    <> string.inspect(state.phase)
     <> " & Id: 0x"
     <> int.to_base16(packet_id),
   )
