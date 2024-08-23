@@ -181,7 +181,7 @@ fn handle_server_bound_handshaking(
   state: State,
 ) {
   case packet {
-    serverbound.Handshake(packet) -> {
+    handshaking.Handshake(packet) -> {
       case packet.next_phase {
         1 -> Ok(State(..state, phase: phase.Status))
         2 -> Ok(State(..state, phase: phase.Login))
@@ -208,27 +208,26 @@ fn handle_server_bound_status(packet: status.Packet, state: State) {
 
 fn handle_server_bound_login(packet: login.Packet, state: State) {
   case packet {
-    login.Login(name, uuid) -> {
+    login.Login(packet) -> {
       // let _ = send(state, login.serialize(login_request), 2)
-      Ok(State(..state, player: Player(name, uuid, 0)))
+      Ok(State(..state, player: Player(packet.name, packet.uuid, 0)))
     }
-    login.Acknowledged -> Ok(State(..state, phase: phase.Configuration))
+    login.LoginAcknowledged -> Ok(State(..state, phase: phase.Configuration))
   }
 }
 
 fn handle_server_bound_configuration(packet: configuration.Packet, state: State) {
   case packet {
-    configuration.ClientInformation(_, _, _, _, _, _, _, _) -> {
+    configuration.ClientInformation(packet) -> {
       let _ = send(state, feature_flags.serialize(), 0x0C)
       let _ = send(state, known_packs.serialize(), 0x0E)
       Ok(state)
     }
-    // Plugin Channels
-    configuration.Plugin(_, _) -> {
+    configuration.Plugin(packet) -> {
       let _ = send(state, brand.serialize(), 0x01)
       Ok(state)
     }
-    configuration.KnownDataPacks(_) -> {
+    configuration.KnownDataPacks(packet) -> {
       // Finish Configuration
       registry.send(state.connection)
       // let _ = send(state, registry.serialize(), 7)

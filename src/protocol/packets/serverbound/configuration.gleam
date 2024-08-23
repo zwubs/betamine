@@ -8,19 +8,10 @@ pub type KnownDataPack {
 }
 
 pub type Packet {
-  ClientInformation(
-    locale: String,
-    view_distance: Int,
-    chat_mode: chat_mode.ChatMode,
-    chat_colors: Bool,
-    model_customizations: Int,
-    main_hand: handedness.Handedness,
-    text_filtering_enabled: Bool,
-    allow_server_listings: Bool,
-  )
-  Plugin(channel: String, implementation: String)
+  ClientInformation(ClientInformationPacket)
+  Plugin(PluginPacket)
   AcknowledgeFinish
-  KnownDataPacks(data_packs: List(KnownDataPack))
+  KnownDataPacks(KnownDataPacksPacket)
 }
 
 pub fn decode(id: Int, data: BitArray) -> Result(Packet, Nil) {
@@ -31,6 +22,19 @@ pub fn decode(id: Int, data: BitArray) -> Result(Packet, Nil) {
     0x07 -> decode_known_data_packs(data)
     _ -> todo
   }
+}
+
+pub type ClientInformationPacket {
+  ClientInformationPacket(
+    locale: String,
+    view_distance: Int,
+    chat_mode: chat_mode.ChatMode,
+    chat_colors: Bool,
+    model_customizations: Int,
+    main_hand: handedness.Handedness,
+    text_filtering_enabled: Bool,
+    allow_server_listings: Bool,
+  )
 }
 
 pub fn decode_client_information(bit_array: BitArray) {
@@ -46,22 +50,32 @@ pub fn decode_client_information(bit_array: BitArray) {
     bit_array,
   ))
   use #(allow_server_listings, _) <- result.try(decoder.boolean(bit_array))
-  Ok(ClientInformation(
-    locale,
-    view_distance,
-    chat_mode,
-    chat_colors,
-    model_customizations,
-    main_hand,
-    text_filtering_enabled,
-    allow_server_listings,
-  ))
+  Ok(
+    ClientInformation(ClientInformationPacket(
+      locale,
+      view_distance,
+      chat_mode,
+      chat_colors,
+      model_customizations,
+      main_hand,
+      text_filtering_enabled,
+      allow_server_listings,
+    )),
+  )
+}
+
+pub type PluginPacket {
+  PluginPacket(channel: String, implementation: String)
 }
 
 pub fn decode_plugin(bit_array: BitArray) {
   use #(channel, bit_array) <- result.try(decoder.string(bit_array))
   use #(implementation, _) <- result.try(decoder.string(bit_array))
-  Ok(Plugin(channel, implementation))
+  Ok(Plugin(PluginPacket(channel, implementation)))
+}
+
+pub type KnownDataPacksPacket {
+  KnownDataPacksPacket(data_packs: List(KnownDataPack))
 }
 
 pub fn decode_known_data_packs(bit_array: BitArray) {
@@ -71,7 +85,7 @@ pub fn decode_known_data_packs(bit_array: BitArray) {
     decode_known_data_pack,
     length,
   ))
-  Ok(KnownDataPacks(data_packs))
+  Ok(KnownDataPacks(KnownDataPacksPacket(data_packs)))
 }
 
 pub fn decode_known_data_pack(
