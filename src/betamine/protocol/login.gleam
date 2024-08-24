@@ -13,9 +13,9 @@ pub fn deserialize(bit_array: BitArray) {
   Ok(LoginRequest(name, uuid))
 }
 
-pub fn serialize(login_request: LoginRequest) {
-  encode.uuid(bytes_builder.new(), login_request.uuid)
-  |> encode.string(login_request.name)
+pub fn serialize(name: String, uuid: Int) {
+  encode.uuid(bytes_builder.new(), uuid)
+  |> encode.string(name)
   |> encode.var_int(0)
   |> encode.var_int(1)
 }

@@ -16,6 +16,7 @@ import betamine/protocol/feature_flags
 import betamine/protocol/game_event
 import betamine/protocol/keep_alive
 import betamine/protocol/known_packs
+import betamine/protocol/login
 import betamine/protocol/login_play
 import betamine/protocol/phase
 import betamine/protocol/ping
@@ -29,6 +30,7 @@ import betamine/protocol/set_player_position
 import betamine/protocol/set_player_position_and_rotation
 import betamine/protocol/set_player_rotation
 import betamine/protocol/spawn_entity
+import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
 import betamine/protocol/update_entity_position
 import betamine/protocol/update_entity_rotation
@@ -42,11 +44,6 @@ import gleam/otp/actor
 import gleam/string
 import glisten
 import protocol/packets/serverbound
-import protocol/packets/serverbound/configuration
-import protocol/packets/serverbound/handshaking
-import protocol/packets/serverbound/login
-import protocol/packets/serverbound/play
-import protocol/packets/serverbound/status
 
 pub type Packet {
   ServerBoundPacket(data: BitArray)
@@ -68,7 +65,7 @@ type State {
 }
 
 type Error {
-  UnknownServerBoundPacket(state: phase.Phase, id: Int)
+  UnknownServerBoundPacket(state: phase.Phase, serverbound.Packet)
   UnknownProtocolState(state: Int)
 }
 
@@ -113,7 +110,7 @@ fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
       let assert Ok(packet) = protocol.decode_serverbound(state.phase, data)
       handle_server_bound(packet, state)
     }
-    ClientBoundPacket(id, _, data) -> todo
+    ClientBoundPacket(id, _, data) -> Ok(state)
     GameUpdate(update) -> handle_game_update(update, state)
     Disconnect -> {
       process.send(
@@ -131,12 +128,12 @@ fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
 
 fn handle_error(error: Error, state: State) {
   case error {
-    UnknownServerBoundPacket(phase, id) -> {
+    UnknownServerBoundPacket(phase, packet) -> {
       io.debug(
-        "Unhandled Packet w/ State: "
+        "Unhandled Packet w/ Phase: "
         <> string.inspect(phase)
-        <> " & Id: 0x"
-        <> int.to_base16(id),
+        <> " & Packet:"
+        <> string.inspect(packet),
       )
       actor.continue(state)
     }
@@ -165,69 +162,42 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     _ -> state
   }
 
-  case packet {
-    serverbound.Handshaking(packet) ->
-      handle_server_bound_handshaking(packet, state)
-    serverbound.Status(packet) -> handle_server_bound_status(packet, state)
-    serverbound.Login(packet) -> handle_server_bound_login(packet, state)
-    serverbound.Configuration(packet) ->
-      handle_server_bound_configuration(packet, state)
-    serverbound.Play(packet) -> handle_server_bound_play(packet, state)
-  }
-}
+  io.debug("Receivied Packet: " <> string.inspect(packet))
 
-fn handle_server_bound_handshaking(
-  packet: serverbound.HandshakingPacket,
-  state: State,
-) {
   case packet {
-    handshaking.Handshake(packet) -> {
+    serverbound.Handshake(packet) -> {
       case packet.next_phase {
         1 -> Ok(State(..state, phase: phase.Status))
         2 -> Ok(State(..state, phase: phase.Login))
         phase -> Error(UnknownProtocolState(phase))
       }
     }
-  }
-}
-
-fn handle_server_bound_status(packet: status.Packet, state: State) {
-  case packet {
-    status.StatusRequest -> {
-      // let status_response = status.serialize()
-      // let _ = send(state, status_response, 0)
+    serverbound.StatusRequest -> {
+      let status_response = status.serialize()
+      let _ = send(state, status_response, 0)
       Ok(state)
     }
-    status.Ping(_) -> {
-      // let ping_response = ping.serialize(ping_request)
-      // let _ = send(state, ping_response, 1)
+    serverbound.StatusPing(packet) -> {
+      let ping_response = ping.serialize(packet.id)
+      let _ = send(state, ping_response, 1)
       Ok(state)
     }
-  }
-}
-
-fn handle_server_bound_login(packet: login.Packet, state: State) {
-  case packet {
-    login.Login(packet) -> {
-      // let _ = send(state, login.serialize(login_request), 2)
+    serverbound.LoginStart(packet) -> {
+      let _ = send(state, login.serialize(packet.name, packet.uuid), 2)
       Ok(State(..state, player: Player(packet.name, packet.uuid, 0)))
     }
-    login.LoginAcknowledged -> Ok(State(..state, phase: phase.Configuration))
-  }
-}
-
-fn handle_server_bound_configuration(packet: configuration.Packet, state: State) {
-  case packet {
-    configuration.ClientInformation(packet) -> {
+    serverbound.LoginAcknowledged ->
+      Ok(State(..state, phase: phase.Configuration))
+    serverbound.ClientInformation(_) -> {
       let _ = send(state, feature_flags.serialize(), 0x0C)
       let _ = send(state, known_packs.serialize(), 0x0E)
       Ok(state)
     }
-    configuration.Plugin(packet) -> {
+    serverbound.Plugin(_) -> {
       let _ = send(state, brand.serialize(), 0x01)
       Ok(state)
     }
-    configuration.KnownDataPacks(packet) -> {
+    serverbound.KnownDataPacks(_) -> {
       // Finish Configuration
       registry.send(state.connection)
       // let _ = send(state, registry.serialize(), 7)
@@ -235,7 +205,7 @@ fn handle_server_bound_configuration(packet: configuration.Packet, state: State)
       Ok(state)
     }
     // Acknowledge Finish Configuration
-    configuration.AcknowledgeFinish -> {
+    serverbound.AcknowledgeFinish -> {
       let #(player, entity) =
         process.call(
           state.game_subject,
@@ -274,21 +244,16 @@ fn handle_server_bound_configuration(packet: configuration.Packet, state: State)
       })
       Ok(State(..state, phase: phase.Play, player:))
     }
-  }
-}
-
-fn handle_server_bound_play(packet: play.Packet, state: State) {
-  case packet {
-    play.ConfirmTeleport(_) -> Ok(state)
-    play.KeepAlive(_) -> Ok(state)
-    play.PlayerPosition(position, on_ground) -> {
+    serverbound.ConfirmTeleport(_) -> Ok(state)
+    serverbound.KeepAlive(_) -> Ok(state)
+    serverbound.PlayerPosition(position, on_ground) -> {
       process.send(
         state.game_subject,
         command.MoveEntity(state.player.entity_id, position, on_ground),
       )
       Ok(state)
     }
-    play.PlayerPositionAndRotation(position, rotation, on_ground) -> {
+    serverbound.PlayerPositionAndRotation(position, rotation, on_ground) -> {
       process.send(
         state.game_subject,
         command.MoveEntity(state.player.entity_id, position, on_ground),
@@ -299,7 +264,7 @@ fn handle_server_bound_play(packet: play.Packet, state: State) {
       )
       Ok(state)
     }
-    play.PlayerRotation(rotation, on_ground) -> {
+    serverbound.PlayerRotation(rotation, on_ground) -> {
       process.send(
         state.game_subject,
         command.RotateEntity(state.player.entity_id, rotation, on_ground),
@@ -367,6 +332,6 @@ fn handle_game_update(update: update.Update, state: State) {
       let _ = send(state, remove_entities.serialize([player.entity_id]), 0x42)
       Ok(state)
     }
-    _ -> todo
+    _ -> Ok(state)
   }
 }

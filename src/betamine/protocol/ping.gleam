@@ -8,6 +8,6 @@ pub fn deserialize(bit_array: BitArray) {
   Ok(long)
 }
 
-pub fn serialize(ping_value: Int) {
-  encoder.long(bytes_builder.new(), ping_value)
+pub fn serialize(id: Int) {
+  encoder.long(bytes_builder.new(), id)
 }
