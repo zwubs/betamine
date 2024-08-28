@@ -1,17 +1,11 @@
 import betamine/common/player.{type Player, Player}
-import betamine/common/position
-import betamine/constants
-import betamine/decoder as decode
 import betamine/encoder as encode
-import betamine/game
 import betamine/game/command
 import betamine/game/update
 import betamine/protocol
 import betamine/protocol/brand
 import betamine/protocol/change_difficulty
 import betamine/protocol/chunk_data
-import betamine/protocol/client_information
-import betamine/protocol/confirm_teleportation
 import betamine/protocol/feature_flags
 import betamine/protocol/game_event
 import betamine/protocol/keep_alive
@@ -26,9 +20,6 @@ import betamine/protocol/registry
 import betamine/protocol/remove_entities
 import betamine/protocol/set_center_chunk
 import betamine/protocol/set_head_rotation
-import betamine/protocol/set_player_position
-import betamine/protocol/set_player_position_and_rotation
-import betamine/protocol/set_player_rotation
 import betamine/protocol/spawn_entity
 import betamine/protocol/status
 import betamine/protocol/synchronize_player_position
@@ -43,11 +34,11 @@ import gleam/list
 import gleam/otp/actor
 import gleam/string
 import glisten
+import protocol/packets/clientbound
 import protocol/packets/serverbound
 
 pub type Packet {
   ServerBoundPacket(data: BitArray)
-  ClientBoundPacket(id: Int, length: Int, data: BitArray)
   GameUpdate(update.Update)
   Disconnect
 }
@@ -110,7 +101,6 @@ fn handle_message(packet: Packet, state: State) -> actor.Next(Packet, State) {
       let assert Ok(packet) = protocol.decode_serverbound(state.phase, data)
       handle_server_bound(packet, state)
     }
-    ClientBoundPacket(id, _, data) -> Ok(state)
     GameUpdate(update) -> handle_game_update(update, state)
     Disconnect -> {
       process.send(
@@ -205,7 +195,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       Ok(state)
     }
     // Acknowledge Finish Configuration
-    serverbound.AcknowledgeFinish -> {
+    serverbound.AcknowledgeFinishConfiguration -> {
       let #(player, entity) =
         process.call(
           state.game_subject,
@@ -246,28 +236,44 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     serverbound.ConfirmTeleport(_) -> Ok(state)
     serverbound.KeepAlive(_) -> Ok(state)
-    serverbound.PlayerPosition(position, on_ground) -> {
+    serverbound.PlayerPosition(packet) -> {
       process.send(
         state.game_subject,
-        command.MoveEntity(state.player.entity_id, position, on_ground),
+        command.MoveEntity(
+          state.player.entity_id,
+          packet.position,
+          packet.on_ground,
+        ),
       )
       Ok(state)
     }
-    serverbound.PlayerPositionAndRotation(position, rotation, on_ground) -> {
+    serverbound.PlayerPositionAndRotation(packet) -> {
       process.send(
         state.game_subject,
-        command.MoveEntity(state.player.entity_id, position, on_ground),
+        command.MoveEntity(
+          state.player.entity_id,
+          packet.position,
+          packet.on_ground,
+        ),
       )
       process.send(
         state.game_subject,
-        command.RotateEntity(state.player.entity_id, rotation, on_ground),
+        command.RotateEntity(
+          state.player.entity_id,
+          packet.rotation,
+          packet.on_ground,
+        ),
       )
       Ok(state)
     }
-    serverbound.PlayerRotation(rotation, on_ground) -> {
+    serverbound.PlayerRotation(packet) -> {
       process.send(
         state.game_subject,
-        command.RotateEntity(state.player.entity_id, rotation, on_ground),
+        command.RotateEntity(
+          state.player.entity_id,
+          packet.rotation,
+          packet.on_ground,
+        ),
       )
       Ok(state)
     }
@@ -332,6 +338,5 @@ fn handle_game_update(update: update.Update, state: State) {
       let _ = send(state, remove_entities.serialize([player.entity_id]), 0x42)
       Ok(state)
     }
-    _ -> Ok(state)
   }
 }

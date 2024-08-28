@@ -11,7 +11,6 @@ pub type Entity {
     position: Position,
     rotation: Rotation,
     head_rotation: Float,
-    data: Nil,
     velocity: Velocity,
   )
 }
@@ -23,6 +22,5 @@ pub const default = Entity(
   position: Position(0.0, 0.0, 0.0),
   rotation: Rotation(0.0, 0.0),
   head_rotation: 0.0,
-  data: Nil,
   velocity: Velocity(0.0, 0.0, 0.0),
 )

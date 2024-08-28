@@ -14,17 +14,13 @@ pub type Packet {
   LoginAcknowledged
   ClientInformation(ClientInformationPacket)
   Plugin(PluginPacket)
-  AcknowledgeFinish
+  AcknowledgeFinishConfiguration
   KnownDataPacks(KnownDataPacksPacket)
-  ConfirmTeleport(id: Int)
-  KeepAlive(id: Int)
-  PlayerPosition(position: Position, on_ground: Bool)
-  PlayerPositionAndRotation(
-    position: Position,
-    rotation: Rotation,
-    on_ground: Bool,
-  )
-  PlayerRotation(rotation: Rotation, on_ground: Bool)
+  ConfirmTeleport(ConfirmTeleportPacket)
+  KeepAlive(KeepAlivePacket)
+  PlayerPosition(PlayerPositionPacket)
+  PlayerPositionAndRotation(PlayerPositionAndRotationPacket)
+  PlayerRotation(PlayerRotationPacket)
 }
 
 pub fn decode(
@@ -57,8 +53,11 @@ pub fn decode(
       case id {
         0x00 -> decode_client_information(data)
         0x02 -> decode_plugin(data)
-        0x03 -> Ok(AcknowledgeFinish)
-        0x07 -> decode_known_data_packs(data)
+        0x03 -> Ok(AcknowledgeFinishConfiguration)
+        0x07 -> {
+          decode_known_data_packs(data)
+          |> result.map(KnownDataPacks)
+        }
         _ -> Error(Nil)
       }
     }
@@ -165,38 +164,49 @@ pub type KnownDataPack {
   KnownDataPack(namespace: String, id: String, version: String)
 }
 
-pub type KnownDataPacksPacket {
-  KnownDataPacksPacket(data_packs: List(KnownDataPack))
-}
-
-pub fn decode_known_data_packs(bit_array: BitArray) {
+fn decode_known_data_packs(bit_array: BitArray) {
   use #(length, bit_array) <- result.try(decoder.var_int(bit_array))
   use #(data_packs, _) <- result.try(decoder.array(
     bit_array,
     decode_known_data_pack,
     length,
   ))
-  Ok(KnownDataPacks(KnownDataPacksPacket(data_packs)))
+  Ok(KnownDataPacksPacket(data_packs))
 }
 
-pub fn decode_known_data_pack(
+pub type KnownDataPacksPacket {
+  KnownDataPacksPacket(data_packs: List(KnownDataPack))
+}
+
+fn decode_known_data_pack(
   bit_array: BitArray,
 ) -> Result(#(KnownDataPack, BitArray), Nil) {
   use #(namespace, bit_array) <- result.try(decoder.string(bit_array))
   use #(id, bit_array) <- result.try(decoder.string(bit_array))
   use #(version, bit_array) <- result.try(decoder.string(bit_array))
-  let known_pack = KnownDataPack(namespace, id, version)
-  Ok(#(known_pack, bit_array))
+  Ok(#(KnownDataPack(namespace, id, version), bit_array))
+}
+
+pub type ConfirmTeleportPacket {
+  ConfirmTeleportPacket(id: Int)
 }
 
 pub fn decode_confirm_teleport(data: BitArray) {
   use #(id, _) <- result.try(decoder.var_int(data))
-  Ok(ConfirmTeleport(id))
+  Ok(ConfirmTeleport(ConfirmTeleportPacket(id)))
+}
+
+pub type KeepAlivePacket {
+  KeepAlivePacket(id: Int)
 }
 
 pub fn decode_keep_alive(data: BitArray) {
   use #(id, _) <- result.try(decoder.var_int(data))
-  Ok(KeepAlive(id))
+  Ok(KeepAlive(KeepAlivePacket(id)))
+}
+
+pub type PlayerPositionPacket {
+  PlayerPositionPacket(position: Position, on_ground: Bool)
 }
 
 pub fn decode_player_position(data: BitArray) {
@@ -205,7 +215,15 @@ pub fn decode_player_position(data: BitArray) {
   use #(z, data) <- result.try(decoder.double(data))
   let position = position.Position(x, y, z)
   use #(on_ground, _) <- result.try(decoder.boolean(data))
-  Ok(PlayerPosition(position, on_ground))
+  Ok(PlayerPosition(PlayerPositionPacket(position, on_ground)))
+}
+
+pub type PlayerPositionAndRotationPacket {
+  PlayerPositionAndRotationPacket(
+    position: Position,
+    rotation: Rotation,
+    on_ground: Bool,
+  )
 }
 
 pub fn decode_player_position_and_rotation(data: BitArray) {
@@ -217,7 +235,17 @@ pub fn decode_player_position_and_rotation(data: BitArray) {
   use #(pitch, data) <- result.try(decoder.float(data))
   let rotation = Rotation(pitch, yaw)
   use #(on_ground, _) <- result.try(decoder.boolean(data))
-  Ok(PlayerPositionAndRotation(position, rotation, on_ground))
+  Ok(
+    PlayerPositionAndRotation(PlayerPositionAndRotationPacket(
+      position,
+      rotation,
+      on_ground,
+    )),
+  )
+}
+
+pub type PlayerRotationPacket {
+  PlayerRotationPacket(rotation: Rotation, on_ground: Bool)
 }
 
 pub fn decode_player_rotation(data: BitArray) {
@@ -225,5 +253,5 @@ pub fn decode_player_rotation(data: BitArray) {
   use #(pitch, data) <- result.try(decoder.float(data))
   let rotation = Rotation(pitch, yaw)
   use #(on_ground, _) <- result.try(decoder.boolean(data))
-  Ok(PlayerRotation(rotation, on_ground))
+  Ok(PlayerRotation(PlayerRotationPacket(rotation, on_ground)))
 }

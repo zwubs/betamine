@@ -1,6 +1,10 @@
+import betamine/common/position.{type Position}
+import betamine/common/velocity.{type Velocity}
+import gleam/bit_array
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/float
 import gleam/int
+import gleam/option.{type Option, None, Some}
 import gleam/string
 
 pub fn bool(builder: BytesBuilder, bool: Bool) -> BytesBuilder {
@@ -65,6 +69,17 @@ pub fn double(builder: BytesBuilder, float: Float) -> BytesBuilder {
   bytes_builder.append(builder, <<float:float-size(64)>>)
 }
 
+pub fn position(builder: BytesBuilder, position: Position) -> BytesBuilder {
+  let x = float.truncate(position.x)
+  let z = float.truncate(position.z)
+  let y = float.truncate(position.y)
+  bytes_builder.append(builder, <<
+    x:int-size(26),
+    z:int-size(26),
+    y:int-size(12),
+  >>)
+}
+
 pub fn angle(builder: BytesBuilder, angle: Float) -> BytesBuilder {
   byte(builder, { angle /. 360.0 *. 256.0 |> float.truncate } % 256)
 }
@@ -91,5 +106,25 @@ pub fn array(
       array(builder, rest, encoder)
     }
     [] -> builder
+  }
+}
+
+pub fn byte_array(builder: BytesBuilder, bit_array: BitArray) {
+  builder
+  |> var_int(bit_array.byte_size(bit_array))
+  |> raw(bit_array)
+}
+
+pub fn optional(
+  builder: BytesBuilder,
+  optional: Option(a),
+  when_some: fn(BytesBuilder, a) -> BytesBuilder,
+) {
+  case optional {
+    None -> bool(builder, False)
+    Some(value) -> {
+      bool(builder, True)
+      |> when_some(value)
+    }
   }
 }
