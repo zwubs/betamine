@@ -9,6 +9,10 @@ pub fn equal(first: Vector3(a), second: Vector3(a)) {
   first.x == second.x && first.y == second.y && first.z == second.z
 }
 
+pub fn subtract(first: Vector3(Float), second: Vector3(Float)) {
+  Vector3(first.x -. second.x, first.y -. second.y, first.z -. second.z)
+}
+
 pub fn multiply_by_scalar(vector3: Vector3(Float), scalar: Float) {
   map(vector3, fn(vector3) { vector3 *. scalar })
 }

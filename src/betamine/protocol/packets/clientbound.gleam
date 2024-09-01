@@ -2,26 +2,27 @@ import betamine/common/chunk
 import betamine/common/difficulty.{type Difficulty}
 import betamine/common/entity_type
 import betamine/common/game_mode
-import betamine/common/position.{type Position}
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
 import betamine/common/vector3.{type Vector3}
 import betamine/constants
-import betamine/encoder
+import betamine/protocol/common
+import betamine/protocol/common/chat_session
+import betamine/protocol/common/game_event
+import betamine/protocol/encoder
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/int
+import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
 import gleam/set
-import protocol/common
-import protocol/common/chat_session
-import protocol/common/game_event
 
 pub type Packet {
   StatusResponse(StatusResponsePacket)
   StatusPong(StatusPongPacket)
   LoginSuccess(LoginSuccessPacket)
+  Plugin(PluginPacket)
   FeatureFlags(FeatureFlagsPacket)
   KnownDataPacks(KnownDataPacksPacket)
   Registry(RegistryPacket)
@@ -33,6 +34,7 @@ pub type Packet {
   LevelChunkWithLight(LevelChunkWithLightPacket)
   PlayerInfoRemove(PlayerInfoRemovePacket)
   PlayerInfoUpdate(PlayerInfoUpdatePacket)
+  SynchronizePlayerPosition(SynchronizePlayerPositionPacket)
   SpawnEntity(SpawnEntityPacket)
   UpdateEntityPosition(UpdateEntityPositionPacket)
   UpdateEntityRotation(UpdateEntityRotationPacket)
@@ -42,7 +44,7 @@ pub type Packet {
 }
 
 pub fn encode(packet: Packet) -> BytesBuilder {
-  case packet {
+  let builder = case packet {
     StatusResponse(packet) -> {
       bytes_builder.from_bit_array(<<0x00>>)
       |> encode_status_response(packet)
@@ -54,6 +56,10 @@ pub fn encode(packet: Packet) -> BytesBuilder {
     LoginSuccess(packet) -> {
       bytes_builder.from_bit_array(<<0x02>>)
       |> encode_login_success(packet)
+    }
+    Plugin(packet) -> {
+      bytes_builder.from_bit_array(<<0x01>>)
+      |> encode_plugin(packet)
     }
     Registry(packet) -> {
       bytes_builder.from_bit_array(<<0x07>>)
@@ -96,6 +102,10 @@ pub fn encode(packet: Packet) -> BytesBuilder {
       bytes_builder.from_bit_array(<<0x3E>>)
       |> encode_player_info_update(packet)
     }
+    SynchronizePlayerPosition(packet) -> {
+      bytes_builder.from_bit_array(<<0x40>>)
+      |> encode_synchronize_player_position(packet)
+    }
     SpawnEntity(packet) -> {
       bytes_builder.from_bit_array(<<0x01>>)
       |> encode_spawn_entity(packet)
@@ -121,6 +131,10 @@ pub fn encode(packet: Packet) -> BytesBuilder {
       |> encode_play_keep_alive(packet)
     }
   }
+
+  let builder_size = bytes_builder.byte_size(builder)
+  let size_as_bytes_builder = encoder.var_int(bytes_builder.new(), builder_size)
+  bytes_builder.prepend_builder(builder, size_as_bytes_builder)
 }
 
 pub type StatusResponsePacket {
@@ -137,36 +151,45 @@ pub type StatusResponsePacket {
 }
 
 fn encode_status_response(builder: BytesBuilder, packet: StatusResponsePacket) {
-  json.object([
-    #(
-      "version",
-      json.object([
-        #("name", json.string(packet.version_name)),
-        #("protocol", json.int(packet.version_protocol)),
-      ]),
-    ),
-    #(
-      "players",
-      json.object([
-        #("max", json.int(packet.max_player_count)),
-        #("online", json.int(packet.online_player_count)),
-        #(
-          "sample",
-          json.array(
-            list.map(packet.players, fn(player) {
-              [#("name", json.string(player.0)), #("id", json.string(player.1))]
-            }),
-            of: json.object,
+  let string =
+    json.object([
+      #(
+        "version",
+        json.object([
+          #("name", json.string(packet.version_name)),
+          #("protocol", json.int(packet.version_protocol)),
+        ]),
+      ),
+      #(
+        "players",
+        json.object([
+          #("max", json.int(packet.max_player_count)),
+          #("online", json.int(packet.online_player_count)),
+          #(
+            "sample",
+            json.array(
+              list.map(packet.players, fn(player) {
+                [
+                  #("name", json.string(player.0)),
+                  #("id", json.string(player.1)),
+                ]
+              }),
+              of: json.object,
+            ),
           ),
-        ),
-      ]),
-    ),
-    #("description", json.object([#("text", json.string(packet.description))])),
-    #("favicon", json.string(packet.favicon)),
-    #("enforcesSecureChat", json.bool(packet.enforces_secure_chat)),
-  ])
-  |> json.to_string
-  |> encoder.string(builder, _)
+        ]),
+      ),
+      #(
+        "description",
+        json.object([#("text", json.string(packet.description))]),
+      ),
+      #("favicon", json.string(packet.favicon)),
+      #("enforcesSecureChat", json.bool(packet.enforces_secure_chat)),
+      #("previewsChat", json.bool(False)),
+    ])
+    |> json.to_string
+  io.debug(string)
+  encoder.string(builder, string)
 }
 
 pub type StatusPongPacket {
@@ -192,6 +215,16 @@ fn encode_login_success(builder: BytesBuilder, packet: LoginSuccessPacket) {
   |> encoder.string(packet.username)
   |> encoder.array(packet.properties, profile.encode_profile_property)
   |> encoder.bool(packet.strict_error_handling)
+}
+
+pub type PluginPacket {
+  PluginPacket(channel: Identifier, implementation: BitArray)
+}
+
+pub fn encode_plugin(builder: BytesBuilder, packet: PluginPacket) {
+  builder
+  |> encoder.identifier(packet.channel)
+  |> encoder.raw(packet.implementation)
 }
 
 pub type Identifier =
@@ -271,35 +304,32 @@ pub type LoginPacket {
   )
 }
 
-pub const default_login = Login(
-  LoginPacket(
-    entity_id: 0,
-    is_hardcore: False,
-    dimensions: [#("minecraft", "overworld")],
-    max_player_count: constants.mc_max_player_count,
-    view_distance: constants.mc_view_distance,
-    simulation_distance: constants.mc_simulation_distance,
-    reduced_debug_info: False,
-    enable_respawn_screen: False,
-    do_limited_crafting: False,
-    dimension_id: 0,
-    dimension_name: #("minecraft", "overworld"),
-    hashed_seed: 0,
-    game_mode: 0,
-    previous_game_mode: -1,
-    is_debug: False,
-    is_flat: False,
-    death_location: None,
-    portal_cooldown: 0,
-    enforce_secure_chat: False,
-  ),
+pub const default_login = LoginPacket(
+  entity_id: 0,
+  is_hardcore: False,
+  dimensions: [#("minecraft", "overworld")],
+  max_player_count: constants.mc_max_player_count,
+  view_distance: constants.mc_view_distance,
+  simulation_distance: constants.mc_simulation_distance,
+  reduced_debug_info: False,
+  enable_respawn_screen: False,
+  do_limited_crafting: False,
+  dimension_id: 0,
+  dimension_name: #("minecraft", "overworld"),
+  hashed_seed: 0,
+  game_mode: 0,
+  previous_game_mode: -1,
+  is_debug: False,
+  is_flat: False,
+  death_location: None,
+  portal_cooldown: 0,
+  enforce_secure_chat: False,
 )
 
 pub fn encode_login(builder: BytesBuilder, packet: LoginPacket) {
   builder
   |> encoder.int(packet.entity_id)
   |> encoder.bool(packet.is_hardcore)
-  |> encoder.var_int(list.length(packet.dimensions))
   |> encoder.array(packet.dimensions, encoder.identifier)
   |> encoder.var_int(packet.max_player_count)
   |> encoder.var_int(packet.view_distance)
@@ -320,7 +350,7 @@ pub fn encode_login(builder: BytesBuilder, packet: LoginPacket) {
 }
 
 pub type DeathLocation {
-  DeathLocation(dimension: Identifier, position: Position)
+  DeathLocation(dimension: Identifier, position: Vector3(Float))
 }
 
 fn encode_death_location(builder: BytesBuilder, death_location: DeathLocation) {
@@ -413,7 +443,7 @@ fn encode_level_chunk_with_light(
 
 pub type SynchronizePlayerPositionPacket {
   SynchronizePlayerPositionPacket(
-    position: Position,
+    position: Vector3(Float),
     rotation: Rotation,
     flags: Int,
     teleport_id: Int,
@@ -576,11 +606,7 @@ fn encode_spawn_entity(builder: BytesBuilder, packet: SpawnEntityPacket) {
 }
 
 pub type UpdateEntityPositionPacket {
-  UpdateEntityPositionPacket(
-    entity_id: Int,
-    delta: Vector3(Float),
-    is_grounded: Bool,
-  )
+  UpdateEntityPositionPacket(id: Int, delta: Vector3(Float), is_grounded: Bool)
 }
 
 fn encode_update_entity_position(
@@ -588,14 +614,14 @@ fn encode_update_entity_position(
   packet: UpdateEntityPositionPacket,
 ) {
   builder
-  |> encoder.var_int(packet.entity_id)
+  |> encoder.var_int(packet.id)
   |> common.encode_delta(packet.delta)
   |> encoder.bool(packet.is_grounded)
 }
 
 pub type UpdateEntityRotationPacket {
   UpdateEntityRotationPacket(
-    entity_id: Int,
+    id: Int,
     yaw: Float,
     pitch: Float,
     is_grounded: Bool,
@@ -607,14 +633,14 @@ fn encode_update_entity_rotation(
   packet: UpdateEntityRotationPacket,
 ) {
   builder
-  |> encoder.var_int(packet.entity_id)
+  |> encoder.var_int(packet.id)
   |> encoder.angle(packet.yaw)
   |> encoder.angle(packet.pitch)
   |> encoder.bool(packet.is_grounded)
 }
 
 pub type SetHeadRotationPacket {
-  SetHeadRotationPacket(entity_id: Int, head_yaw: Float)
+  SetHeadRotationPacket(id: Int, head_yaw: Float)
 }
 
 fn encode_set_head_rotation(
@@ -622,7 +648,7 @@ fn encode_set_head_rotation(
   packet: SetHeadRotationPacket,
 ) {
   builder
-  |> encoder.var_int(packet.entity_id)
+  |> encoder.var_int(packet.id)
   |> encoder.angle(packet.head_yaw)
 }
 

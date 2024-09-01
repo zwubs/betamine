@@ -1,5 +1,5 @@
 import betamine/common/game_mode.{type GameMode}
-import betamine/encoder
+import betamine/protocol/encoder
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/int
 

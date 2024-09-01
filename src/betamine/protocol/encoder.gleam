@@ -1,9 +1,9 @@
-import betamine/common/position.{type Position}
-import betamine/common/velocity.{type Velocity}
+import betamine/common/vector3.{type Vector3}
 import gleam/bit_array
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/float
 import gleam/int
+import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
 
@@ -69,7 +69,7 @@ pub fn double(builder: BytesBuilder, float: Float) -> BytesBuilder {
   bytes_builder.append(builder, <<float:float-size(64)>>)
 }
 
-pub fn position(builder: BytesBuilder, position: Position) -> BytesBuilder {
+pub fn position(builder: BytesBuilder, position: Vector3(Float)) -> BytesBuilder {
   let x = float.truncate(position.x)
   let z = float.truncate(position.z)
   let y = float.truncate(position.y)
@@ -100,11 +100,9 @@ pub fn array(
   list: List(value),
   encoder: Encoder(value),
 ) -> BytesBuilder {
+  let builder = var_int(builder, list.length(list))
   case list {
-    [first, ..rest] -> {
-      let builder = encoder(builder, first)
-      array(builder, rest, encoder)
-    }
+    [first, ..rest] -> builder |> encoder(first) |> array(rest, encoder)
     [] -> builder
   }
 }

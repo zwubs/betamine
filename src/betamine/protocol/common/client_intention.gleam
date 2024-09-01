@@ -1,4 +1,4 @@
-import protocol/error
+import betamine/protocol/error
 
 pub type Intention {
   Status
@@ -11,6 +11,6 @@ pub fn from_int(int: Int) {
     0 -> Ok(Status)
     1 -> Ok(Login)
     2 -> Ok(Transfer)
-    _ -> Error(error.InvalidClientIntention(int))
+    _ -> Error(error.InvalidEnumValue(min: 0, max: 2, value: int))
   }
 }

@@ -1,5 +1,5 @@
+import betamine/protocol/encoder
 import gleam/bytes_builder.{type BytesBuilder}
-import protocol/encoder
 
 pub const default_chunk = [
   default_chunk_section, default_empty_chunk_section,

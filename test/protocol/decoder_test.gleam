@@ -1,4 +1,4 @@
-import betamine/decoder
+import betamine/protocol/decoder
 import gleam/pair
 import gleeunit/should
 

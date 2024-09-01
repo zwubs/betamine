@@ -1,5 +1,5 @@
 import betamine/common/vector3.{type Vector3}
-import betamine/encoder
+import betamine/protocol/encoder
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/float
 

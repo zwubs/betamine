@@ -1,4 +1,4 @@
-import betamine/encoder as encode
+import betamine/protocol/decoder as encode
 import gleam/bytes_builder
 import gleam/io
 import glisten.{type Connection}

@@ -1,4 +1,4 @@
-import betamine/encoder
+import betamine/protocol/encoder
 import gleam/bytes_builder.{type BytesBuilder}
 
 pub type ChatSession {

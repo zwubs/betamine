@@ -1,10 +1,11 @@
-import betamine/common/position.{type Position, Position}
 import betamine/common/rotation.{type Rotation, Rotation}
+import betamine/common/vector3.{type Vector3, Vector3}
+import betamine/protocol/common/chat_mode
+import betamine/protocol/common/handedness
+import betamine/protocol/decoder
+import betamine/protocol/error.{InvalidPacket, UnhandledPacket}
 import betamine/protocol/phase
 import gleam/result
-import protocol/common/chat_mode
-import protocol/common/handedness
-import protocol/decoder
 
 pub type Packet {
   Handshake(HandshakePacket)
@@ -27,26 +28,27 @@ pub fn decode(
   phase: phase.Phase,
   id: Int,
   data: BitArray,
-) -> Result(Packet, Nil) {
+) -> Result(Packet, error.ProtocolError) {
   case phase {
     phase.Handshaking -> {
       case id {
         0x00 -> decode_handshake(data)
-        _ -> Error(Nil)
+        0xF3 -> Error(UnhandledPacket(phase, id))
+        _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Status -> {
       case id {
         0x00 -> Ok(StatusRequest)
         0x01 -> decode_ping(data, StatusPing)
-        _ -> Error(Nil)
+        _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Login -> {
       case id {
         0x00 -> decode_login_start(data)
         0x03 -> Ok(LoginAcknowledged)
-        _ -> Error(Nil)
+        _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Configuration -> {
@@ -58,7 +60,7 @@ pub fn decode(
           decode_known_data_packs(data)
           |> result.map(KnownDataPacks)
         }
-        _ -> Error(Nil)
+        _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Play -> {
@@ -68,7 +70,7 @@ pub fn decode(
         0x1A -> decode_player_position(data)
         0x1B -> decode_player_position_and_rotation(data)
         0x1C -> decode_player_rotation(data)
-        _ -> Error(Nil)
+        _ -> Error(InvalidPacket(phase, id))
       }
     }
   }
@@ -87,8 +89,8 @@ pub fn decode_handshake(bit_array: BitArray) {
   use #(protocol_version, bit_array) <- result.try(decoder.var_int(bit_array))
   use #(address, bit_array) <- result.try(decoder.string(bit_array))
   use #(port, bit_array) <- result.try(decoder.unsigned_short(bit_array))
-  use #(next_state, _) <- result.try(decoder.var_int(bit_array))
-  Ok(Handshake(HandshakePacket(protocol_version, address, port, next_state)))
+  use #(next_phase, _) <- result.try(decoder.var_int(bit_array))
+  Ok(Handshake(HandshakePacket(protocol_version, address, port, next_phase)))
 }
 
 pub type PingPacket {
@@ -178,9 +180,7 @@ pub type KnownDataPacksPacket {
   KnownDataPacksPacket(data_packs: List(KnownDataPack))
 }
 
-fn decode_known_data_pack(
-  bit_array: BitArray,
-) -> Result(#(KnownDataPack, BitArray), Nil) {
+fn decode_known_data_pack(bit_array: BitArray) {
   use #(namespace, bit_array) <- result.try(decoder.string(bit_array))
   use #(id, bit_array) <- result.try(decoder.string(bit_array))
   use #(version, bit_array) <- result.try(decoder.string(bit_array))
@@ -206,21 +206,21 @@ pub fn decode_keep_alive(data: BitArray) {
 }
 
 pub type PlayerPositionPacket {
-  PlayerPositionPacket(position: Position, on_ground: Bool)
+  PlayerPositionPacket(position: Vector3(Float), on_ground: Bool)
 }
 
 pub fn decode_player_position(data: BitArray) {
   use #(x, data) <- result.try(decoder.double(data))
   use #(y, data) <- result.try(decoder.double(data))
   use #(z, data) <- result.try(decoder.double(data))
-  let position = position.Position(x, y, z)
+  let position = Vector3(x, y, z)
   use #(on_ground, _) <- result.try(decoder.boolean(data))
   Ok(PlayerPosition(PlayerPositionPacket(position, on_ground)))
 }
 
 pub type PlayerPositionAndRotationPacket {
   PlayerPositionAndRotationPacket(
-    position: Position,
+    position: Vector3(Float),
     rotation: Rotation,
     on_ground: Bool,
   )
@@ -230,7 +230,7 @@ pub fn decode_player_position_and_rotation(data: BitArray) {
   use #(x, data) <- result.try(decoder.double(data))
   use #(y, data) <- result.try(decoder.double(data))
   use #(z, data) <- result.try(decoder.double(data))
-  let position = Position(x, y, z)
+  let position = Vector3(x, y, z)
   use #(yaw, data) <- result.try(decoder.float(data))
   use #(pitch, data) <- result.try(decoder.float(data))
   let rotation = Rotation(pitch, yaw)

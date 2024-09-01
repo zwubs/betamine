@@ -1,7 +1,7 @@
 import betamine/common/entity.{type Entity}
 import betamine/common/entity_type
 import betamine/common/player.{type Player}
-import betamine/common/position.{Position}
+import betamine/common/vector3
 import betamine/constants
 import betamine/game/command.{type Command}
 import betamine/game/update.{type Update}
@@ -79,16 +79,14 @@ fn loop(command: Command, game: Game) -> actor.Next(Command, Game) {
       let entity = case dict.get(game.entities, entity_id) {
         Ok(entity) -> {
           let old_position = entity.position
-          let entity = case position.equal(old_position, new_position) {
+          let entity = case vector3.equal(old_position, new_position) {
             True -> entity
             False -> {
-              io.debug(new_position)
               update_sessions(
                 game,
                 update.EntityPosition(
                   entity.id,
-                  old_position,
-                  new_position,
+                  vector3.subtract(new_position, old_position),
                   on_ground,
                 ),
               )
