@@ -1,16 +1,16 @@
 import betamine/common/entity.{type Entity}
 import betamine/common/entity_type
 import betamine/common/player.{type Player}
-import betamine/common/position.{Position}
+import betamine/common/vector3
 import betamine/constants
 import betamine/game/command.{type Command}
 import betamine/game/update.{type Update}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/function
-import gleam/io
 import gleam/list
 import gleam/otp/actor
+import gleam/pair
 
 type Game {
   Game(
@@ -49,13 +49,15 @@ pub fn start() -> Result(Subject(Command), actor.StartError) {
 fn loop(command: Command, game: Game) -> actor.Next(Command, Game) {
   case command {
     command.GetAllPlayers(subject) -> {
-      let players =
-        dict.values(game.sessions) |> list.map(fn(session) { session.1 })
-      process.send(subject, players)
-      actor.continue(game)
-    }
-    command.GetAllEntities(subject) -> {
-      process.send(subject, dict.values(game.entities))
+      dict.values(game.sessions)
+      |> list.map(pair.second)
+      |> list.map(fn(player) {
+        case dict.get(game.entities, player.entity_id) {
+          Ok(entity) -> #(player, entity)
+          Error(_) -> #(player, entity.default)
+        }
+      })
+      |> process.send(subject, _)
       actor.continue(game)
     }
     command.SpawnPlayer(subject, player_subject, uuid, name) -> {
@@ -79,16 +81,14 @@ fn loop(command: Command, game: Game) -> actor.Next(Command, Game) {
       let entity = case dict.get(game.entities, entity_id) {
         Ok(entity) -> {
           let old_position = entity.position
-          let entity = case position.equal(old_position, new_position) {
+          let entity = case vector3.equal(old_position, new_position) {
             True -> entity
             False -> {
-              io.debug(new_position)
               update_sessions(
                 game,
                 update.EntityPosition(
                   entity.id,
-                  old_position,
-                  new_position,
+                  vector3.subtract(new_position, old_position),
                   on_ground,
                 ),
               )

@@ -1,6 +1,10 @@
+import betamine/common/vector3.{type Vector3}
+import gleam/bit_array
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/float
 import gleam/int
+import gleam/list
+import gleam/option.{type Option, None, Some}
 import gleam/string
 
 pub fn bool(builder: BytesBuilder, bool: Bool) -> BytesBuilder {
@@ -65,6 +69,17 @@ pub fn double(builder: BytesBuilder, float: Float) -> BytesBuilder {
   bytes_builder.append(builder, <<float:float-size(64)>>)
 }
 
+pub fn position(builder: BytesBuilder, position: Vector3(Float)) -> BytesBuilder {
+  let x = float.truncate(position.x)
+  let z = float.truncate(position.z)
+  let y = float.truncate(position.y)
+  bytes_builder.append(builder, <<
+    x:int-size(26),
+    z:int-size(26),
+    y:int-size(12),
+  >>)
+}
+
 pub fn angle(builder: BytesBuilder, angle: Float) -> BytesBuilder {
   byte(builder, { angle /. 360.0 *. 256.0 |> float.truncate } % 256)
 }
@@ -80,16 +95,43 @@ pub fn raw(builder: BytesBuilder, bit_array: BitArray) {
 type Encoder(value) =
   fn(BytesBuilder, value) -> BytesBuilder
 
+pub fn raw_array(
+  builder: BytesBuilder,
+  list: List(value),
+  encoder: Encoder(value),
+) {
+  case list {
+    [first, ..rest] -> encoder(builder, first) |> raw_array(rest, encoder)
+    [] -> builder
+  }
+}
+
+/// Encodes a length prefixed array
 pub fn array(
   builder: BytesBuilder,
   list: List(value),
   encoder: Encoder(value),
 ) -> BytesBuilder {
-  case list {
-    [first, ..rest] -> {
-      let builder = encoder(builder, first)
-      array(builder, rest, encoder)
+  var_int(builder, list.length(list))
+  |> raw_array(list, encoder)
+}
+
+pub fn byte_array(builder: BytesBuilder, bit_array: BitArray) {
+  builder
+  |> var_int(bit_array.byte_size(bit_array))
+  |> raw(bit_array)
+}
+
+pub fn optional(
+  builder: BytesBuilder,
+  optional: Option(a),
+  when_some: fn(BytesBuilder, a) -> BytesBuilder,
+) {
+  case optional {
+    None -> bool(builder, False)
+    Some(value) -> {
+      bool(builder, True)
+      |> when_some(value)
     }
-    [] -> builder
   }
 }

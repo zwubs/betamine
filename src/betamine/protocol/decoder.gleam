@@ -1,10 +1,10 @@
+import betamine/protocol/error.{type ProtocolError}
 import gleam/bit_array
 import gleam/int
-import gleam/io
 import gleam/result.{map, try}
 
 type DecodeResult(value) =
-  Result(#(value, BitArray), Nil)
+  Result(#(value, BitArray), ProtocolError)
 
 @external(erlang, "erlang", "bit_size")
 pub fn bit_size(x: BitArray) -> Int
@@ -38,14 +38,7 @@ fn var_int_accumulator(
         _ -> Ok(#(int.bitwise_and(int32_mask, accumulated_int), bit_array))
       }
     }
-    _ -> Error(Nil)
-  }
-}
-
-pub fn ignore(bit_array: BitArray, byte_count: Int) -> DecodeResult(Nil) {
-  case bit_array {
-    <<_:bytes-size(byte_count), bit_array:bytes>> -> Ok(#(Nil, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.InvalidVarInt)
   }
 }
 
@@ -55,8 +48,13 @@ pub fn bytes_of_length(
 ) -> DecodeResult(BitArray) {
   case bit_array {
     <<bytes:bytes-size(length), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.InvalidByteRange(bit_array, length))
   }
+}
+
+pub fn ignore(bit_array: BitArray, length: Int) -> DecodeResult(Nil) {
+  bytes_of_length(bit_array, length)
+  |> result.map(fn(decoded) { #(Nil, decoded.1) })
 }
 
 pub fn string(bit_array: BitArray) -> DecodeResult(String) {
@@ -68,55 +66,55 @@ pub fn string(bit_array: BitArray) -> DecodeResult(String) {
 
 fn string_from_bytes(bytes: BitArray) {
   bit_array.to_string(bytes)
-  |> result.replace_error(Nil)
+  |> result.replace_error(error.InvalidString(bytes))
 }
 
 pub fn short(bit_array: BitArray) {
   case bit_array {
     <<bytes:int-size(16), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn unsigned_short(bit_array: BitArray) {
   case bit_array {
     <<bytes:int-unsigned-size(16), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn int(bit_array: BitArray) {
   case bit_array {
     <<bytes:int-signed-size(32), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn long(bit_array: BitArray) {
   case bit_array {
     <<bytes:int-signed-size(64), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn uuid(bit_array: BitArray) {
   case bit_array {
     <<bytes:int-unsigned-size(128), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn byte(bit_array: BitArray) {
   case bit_array {
     <<byte:int-signed, bit_array:bytes>> -> Ok(#(byte, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn unsigned_byte(bit_array: BitArray) {
   case bit_array {
     <<byte:int-unsigned, bit_array:bytes>> -> Ok(#(byte, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
@@ -126,24 +124,24 @@ pub fn boolean(bit_array: BitArray) {
       case bool {
         0 -> Ok(#(False, bit_array))
         1 -> Ok(#(True, bit_array))
-        _ -> Error(Nil)
+        _ -> Error(error.InvalidBoolean)
       }
     }
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn float(bit_array: BitArray) {
   case bit_array {
     <<bytes:float-size(32), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
 pub fn double(bit_array: BitArray) {
   case bit_array {
     <<bytes:float-size(64), bit_array:bytes>> -> Ok(#(bytes, bit_array))
-    _ -> Error(Nil)
+    _ -> Error(error.EndOfData)
   }
 }
 
@@ -155,18 +153,18 @@ type ArrayParser(value, error) =
 
 pub fn array(
   bit_array: BitArray,
-  parser: ArrayParser(value, Nil),
+  parser: ArrayParser(value, ProtocolError),
   length: Int,
-) -> DecodeArrayResult(value, Nil) {
+) -> DecodeArrayResult(value, ProtocolError) {
   array_elements(bit_array, parser, [], length)
 }
 
 fn array_elements(
   bit_array: BitArray,
-  parser: ArrayParser(value, error),
+  parser: ArrayParser(value, ProtocolError),
   values: List(value),
   length: Int,
-) -> DecodeArrayResult(value, error) {
+) -> DecodeArrayResult(value, ProtocolError) {
   case length {
     l if l < 1 -> Ok(#(values, bit_array))
     _ -> {

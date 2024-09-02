@@ -31,8 +31,7 @@ fn init(
 }
 
 fn handler(message, session_subject: Subject(session.Packet), _conn) {
-  let assert Packet(bit_array) = message
-  let packet = session.deserialize_server_bound_packet(bit_array)
-  process.send(session_subject, packet)
+  let assert Packet(data) = message
+  process.send(session_subject, session.ServerBoundPacket(data))
   actor.continue(session_subject)
 }

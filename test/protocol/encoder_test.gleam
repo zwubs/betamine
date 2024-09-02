@@ -1,4 +1,5 @@
-import betamine/encoder
+import betamine/protocol/encoder
+import gleam/bit_array
 import gleam/bytes_builder
 import gleeunit/should
 
@@ -30,4 +31,9 @@ pub fn encode_var_int_one_test() {
 pub fn encode_var_int_negative_one_test() {
   encode_var_int(-1)
   |> should.equal(<<0xFF, 0xFF, 0xFF, 0xFF, 0x0F>>)
+}
+
+pub fn encode_var_int_test() {
+  encode_var_int(200)
+  |> should.equal(<<200, 1>>)
 }
