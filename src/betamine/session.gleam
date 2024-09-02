@@ -1,7 +1,5 @@
 import betamine/common/difficulty
-import betamine/common/game_mode
 import betamine/common/player.{type Player, Player}
-import betamine/common/profile
 import betamine/constants
 import betamine/game/command
 import betamine/game/update
@@ -19,9 +17,7 @@ import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/io
 import gleam/list
-import gleam/option
 import gleam/otp/actor
-import gleam/set
 import gleam/string
 import glisten
 

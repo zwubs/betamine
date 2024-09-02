@@ -5,7 +5,6 @@ import betamine/protocol/common/handedness
 import betamine/protocol/decoder
 import betamine/protocol/error.{InvalidPacket, UnhandledPacket}
 import betamine/protocol/phase
-import gleam/io
 import gleam/result
 
 pub type Packet {

@@ -8,7 +8,6 @@ import betamine/game/update.{type Update}
 import gleam/dict
 import gleam/erlang/process.{type Subject}
 import gleam/function
-import gleam/io
 import gleam/list
 import gleam/otp/actor
 import gleam/pair

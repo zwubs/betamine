@@ -12,7 +12,6 @@ import betamine/protocol/common/game_event
 import betamine/protocol/encoder
 import gleam/bytes_builder.{type BytesBuilder}
 import gleam/int
-import gleam/io
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
