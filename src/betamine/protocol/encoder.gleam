@@ -95,16 +95,25 @@ pub fn raw(builder: BytesBuilder, bit_array: BitArray) {
 type Encoder(value) =
   fn(BytesBuilder, value) -> BytesBuilder
 
+pub fn raw_array(
+  builder: BytesBuilder,
+  list: List(value),
+  encoder: Encoder(value),
+) {
+  case list {
+    [first, ..rest] -> encoder(builder, first) |> raw_array(rest, encoder)
+    [] -> builder
+  }
+}
+
+/// Encodes a length prefixed array
 pub fn array(
   builder: BytesBuilder,
   list: List(value),
   encoder: Encoder(value),
 ) -> BytesBuilder {
-  let builder = var_int(builder, list.length(list))
-  case list {
-    [first, ..rest] -> builder |> encoder(first) |> array(rest, encoder)
-    [] -> builder
-  }
+  var_int(builder, list.length(list))
+  |> raw_array(list, encoder)
 }
 
 pub fn byte_array(builder: BytesBuilder, bit_array: BitArray) {

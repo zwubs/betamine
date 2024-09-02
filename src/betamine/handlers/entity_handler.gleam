@@ -1,6 +1,5 @@
 import betamine/common/entity.{type Entity}
 import betamine/common/rotation
-import betamine/common/vector3
 import betamine/protocol/packets/clientbound.{type Packet}
 
 pub fn handle_spawn(entity: Entity) -> Packet {

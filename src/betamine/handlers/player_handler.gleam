@@ -9,7 +9,6 @@ import gleam/set
 
 pub fn handle_spawn(player: Player, entity: Entity) -> List(Packet) {
   [
-    entity_handler.handle_spawn(entity),
     clientbound.PlayerInfoUpdate(
       clientbound.PlayerInfoUpdatePacket(
         actions: set.from_list([clientbound.AddPlayer]),
@@ -27,6 +26,7 @@ pub fn handle_spawn(player: Player, entity: Entity) -> List(Packet) {
         ],
       ),
     ),
+    entity_handler.handle_spawn(entity),
   ]
 }
 

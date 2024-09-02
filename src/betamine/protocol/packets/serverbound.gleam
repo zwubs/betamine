@@ -5,6 +5,7 @@ import betamine/protocol/common/handedness
 import betamine/protocol/decoder
 import betamine/protocol/error.{InvalidPacket, UnhandledPacket}
 import betamine/protocol/phase
+import gleam/io
 import gleam/result
 
 pub type Packet {
@@ -33,7 +34,6 @@ pub fn decode(
     phase.Handshaking -> {
       case id {
         0x00 -> decode_handshake(data)
-        0xF3 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }

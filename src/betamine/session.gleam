@@ -211,7 +211,9 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.Plugin(_) -> {
       send(state, [
         clientbound.Plugin(
-          clientbound.PluginPacket(#("minecraft", "brand"), <<"beatmine":utf8>>),
+          clientbound.PluginPacket(#("minecraft", "brand"), <<
+            8, "betamine":utf8,
+          >>),
         ),
       ])
       Ok(state)
@@ -262,45 +264,11 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         ),
       ])
 
-      let players =
-        process.call(state.game_subject, command.GetAllPlayers, 1000)
-      list.map(players, fn(player) {
-        send(state, [
-          clientbound.PlayerInfoUpdate(
-            clientbound.PlayerInfoUpdatePacket(
-              set.from_list([clientbound.AddPlayer]),
-              [
-                clientbound.PlayerInfoUpdateEntry(
-                  player.uuid,
-                  player.name,
-                  0,
-                  True,
-                  profile.Profile(player.uuid, player.name, []),
-                  game_mode.Survival,
-                  option.None,
-                  option.None,
-                ),
-              ],
-            ),
-          ),
-        ])
-      })
-      let entities =
-        process.call(state.game_subject, command.GetAllEntities, 1000)
-      list.filter(entities, fn(entity) { entity.id != player.entity_id })
-      |> list.map(fn(entity) {
-        send(state, [
-          clientbound.SpawnEntity(clientbound.SpawnEntityPacket(
-            entity_type: entity.entity_type,
-            head_rotation: entity.head_rotation,
-            id: entity.id,
-            position: entity.position,
-            rotation: entity.rotation,
-            uuid: entity.uuid,
-            velocity: entity.velocity,
-          )),
-        ])
-      })
+      process.call(state.game_subject, command.GetAllPlayers, 1000)
+      |> list.filter(fn(player) { { player.0 }.uuid != state.player.uuid })
+      |> list.map(fn(player) { player_handler.handle_spawn(player.0, player.1) })
+      |> list.flatten
+      |> send(state, _)
       Ok(State(..state, phase: phase.Play, player:))
     }
     serverbound.ConfirmTeleport(_) -> Ok(state)

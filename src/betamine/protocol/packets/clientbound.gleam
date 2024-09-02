@@ -44,7 +44,7 @@ pub type Packet {
 }
 
 pub fn encode(packet: Packet) -> BytesBuilder {
-  let builder = case packet {
+  case packet {
     StatusResponse(packet) -> {
       bytes_builder.from_bit_array(<<0x00>>)
       |> encode_status_response(packet)
@@ -131,10 +131,6 @@ pub fn encode(packet: Packet) -> BytesBuilder {
       |> encode_play_keep_alive(packet)
     }
   }
-
-  let builder_size = bytes_builder.byte_size(builder)
-  let size_as_bytes_builder = encoder.var_int(bytes_builder.new(), builder_size)
-  bytes_builder.prepend_builder(builder, size_as_bytes_builder)
 }
 
 pub type StatusResponsePacket {
@@ -151,45 +147,36 @@ pub type StatusResponsePacket {
 }
 
 fn encode_status_response(builder: BytesBuilder, packet: StatusResponsePacket) {
-  let string =
-    json.object([
-      #(
-        "version",
-        json.object([
-          #("name", json.string(packet.version_name)),
-          #("protocol", json.int(packet.version_protocol)),
-        ]),
-      ),
-      #(
-        "players",
-        json.object([
-          #("max", json.int(packet.max_player_count)),
-          #("online", json.int(packet.online_player_count)),
-          #(
-            "sample",
-            json.array(
-              list.map(packet.players, fn(player) {
-                [
-                  #("name", json.string(player.0)),
-                  #("id", json.string(player.1)),
-                ]
-              }),
-              of: json.object,
-            ),
+  json.object([
+    #(
+      "version",
+      json.object([
+        #("name", json.string(packet.version_name)),
+        #("protocol", json.int(packet.version_protocol)),
+      ]),
+    ),
+    #(
+      "players",
+      json.object([
+        #("max", json.int(packet.max_player_count)),
+        #("online", json.int(packet.online_player_count)),
+        #(
+          "sample",
+          json.array(
+            list.map(packet.players, fn(player) {
+              [#("name", json.string(player.0)), #("id", json.string(player.1))]
+            }),
+            of: json.object,
           ),
-        ]),
-      ),
-      #(
-        "description",
-        json.object([#("text", json.string(packet.description))]),
-      ),
-      #("favicon", json.string(packet.favicon)),
-      #("enforcesSecureChat", json.bool(packet.enforces_secure_chat)),
-      #("previewsChat", json.bool(False)),
-    ])
-    |> json.to_string
-  io.debug(string)
-  encoder.string(builder, string)
+        ),
+      ]),
+    ),
+    #("description", json.object([#("text", json.string(packet.description))])),
+    #("favicon", json.string(packet.favicon)),
+    #("enforcesSecureChat", json.bool(packet.enforces_secure_chat)),
+  ])
+  |> json.to_string
+  |> encoder.string(builder, _)
 }
 
 pub type StatusPongPacket {
@@ -426,19 +413,27 @@ fn encode_level_chunk_with_light(
   builder: BytesBuilder,
   packet: LevelChunkWithLightPacket,
 ) {
-  builder
-  |> encoder.int(packet.x)
-  |> encoder.int(packet.z)
-  |> encoder.raw(packet.height_maps)
-  |> encoder.array(packet.sections, chunk.encode_section)
-  |> encoder.array(packet.block_entities, fn(_, _) { todo })
-  |> encoder.array(packet.sky_light_mask, fn(_, _) { todo })
-  |> encoder.array(packet.block_light_mask, fn(_, _) { todo })
-  |> encoder.array(packet.empty_sky_light_mask, fn(_, _) { todo })
-  |> encoder.array(packet.empty_block_light_mask, fn(_, _) { todo })
-  |> encoder.array(packet.empty_block_light_mask, fn(_, _) { todo })
-  |> encoder.array(packet.sky_light_arrays, encoder.byte_array)
-  |> encoder.array(packet.block_light_arrays, encoder.byte_array)
+  let header =
+    bytes_builder.new()
+    |> encoder.int(packet.x)
+    |> encoder.int(packet.z)
+    |> encoder.raw(packet.height_maps)
+  let data =
+    bytes_builder.new()
+    |> encoder.raw_array(packet.sections, chunk.encode_section)
+  let data_size =
+    bytes_builder.new()
+    |> encoder.var_int(bytes_builder.byte_size(data))
+  let footer =
+    bytes_builder.new()
+    |> encoder.array(packet.block_entities, fn(_, _) { todo })
+    |> encoder.array(packet.sky_light_mask, fn(_, _) { todo })
+    |> encoder.array(packet.block_light_mask, fn(_, _) { todo })
+    |> encoder.array(packet.empty_sky_light_mask, fn(_, _) { todo })
+    |> encoder.array(packet.empty_block_light_mask, fn(_, _) { todo })
+    |> encoder.array(packet.sky_light_arrays, encoder.byte_array)
+    |> encoder.array(packet.block_light_arrays, encoder.byte_array)
+  bytes_builder.concat([builder, header, data_size, data, footer])
 }
 
 pub type SynchronizePlayerPositionPacket {
@@ -508,7 +503,7 @@ fn get_player_info_update_action_bit_field(
   actions: set.Set(PlayerInfoUpdateAction),
 ) {
   set.fold(actions, 0, fn(bit_field, action) {
-    int.bitwise_and(bit_field, get_player_info_update_action_bit(action))
+    int.bitwise_or(bit_field, get_player_info_update_action_bit(action))
   })
 }
 
@@ -665,5 +660,5 @@ pub type PlayKeepAlivePacket {
 }
 
 fn encode_play_keep_alive(builder: BytesBuilder, packet: PlayKeepAlivePacket) {
-  encoder.var_int(builder, packet.id)
+  encoder.long(builder, packet.id)
 }

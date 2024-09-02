@@ -11,6 +11,7 @@ import gleam/function
 import gleam/io
 import gleam/list
 import gleam/otp/actor
+import gleam/pair
 
 type Game {
   Game(
@@ -49,13 +50,15 @@ pub fn start() -> Result(Subject(Command), actor.StartError) {
 fn loop(command: Command, game: Game) -> actor.Next(Command, Game) {
   case command {
     command.GetAllPlayers(subject) -> {
-      let players =
-        dict.values(game.sessions) |> list.map(fn(session) { session.1 })
-      process.send(subject, players)
-      actor.continue(game)
-    }
-    command.GetAllEntities(subject) -> {
-      process.send(subject, dict.values(game.entities))
+      dict.values(game.sessions)
+      |> list.map(pair.second)
+      |> list.map(fn(player) {
+        case dict.get(game.entities, player.entity_id) {
+          Ok(entity) -> #(player, entity)
+          Error(_) -> #(player, entity.default)
+        }
+      })
+      |> process.send(subject, _)
       actor.continue(game)
     }
     command.SpawnPlayer(subject, player_subject, uuid, name) -> {

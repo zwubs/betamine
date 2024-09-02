@@ -16,7 +16,6 @@ pub type Command {
   RemovePlayer(uuid: Int, subject: Subject(update.Update))
   MoveEntity(entity_id: Int, position: Vector3(Float), on_ground: Bool)
   RotateEntity(entity_id: Int, rotation: Rotation, on_ground: Bool)
-  GetAllPlayers(subject: Subject(List(Player)))
-  GetAllEntities(subject: Subject(List(Entity)))
+  GetAllPlayers(subject: Subject(List(#(Player, Entity))))
   Shutdown
 }
