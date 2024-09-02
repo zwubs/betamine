@@ -47,6 +47,7 @@ pub fn decode(
       case id {
         0x00 -> decode_login_start(data)
         0x03 -> Ok(LoginAcknowledged)
+        id if id <= 0x04 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }
@@ -59,6 +60,7 @@ pub fn decode(
           decode_known_data_packs(data)
           |> result.map(KnownDataPacks)
         }
+        id if id <= 0x07 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }
@@ -69,6 +71,7 @@ pub fn decode(
         0x1A -> decode_player_position(data)
         0x1B -> decode_player_position_and_rotation(data)
         0x1C -> decode_player_rotation(data)
+        id if id <= 0x39 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }

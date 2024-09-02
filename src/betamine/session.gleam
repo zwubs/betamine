@@ -217,7 +217,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.KnownDataPacks(_) -> {
       // Finish Configuration
       registry.send(state.connection)
-      // let _ = send(state, registry.serialize(), 7)
       let _ = send(state, [clientbound.FinishConfiguration])
       Ok(state)
     }
