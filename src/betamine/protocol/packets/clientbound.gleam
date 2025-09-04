@@ -397,23 +397,25 @@ pub type LevelChunkWithLightPacket {
   )
 }
 
-pub const default_level_chunk_with_light_packet = LevelChunkWithLightPacket(
-  x: 0,
-  z: 0,
-  height_maps: <<0x0A, 0x00>>,
-  sections: chunk.default_chunk,
-  block_entities: [],
-  sky_light_mask: [],
-  block_light_mask: [],
-  empty_sky_light_mask: [],
-  empty_block_light_mask: [],
-  sky_light_arrays: [],
-  block_light_arrays: [],
-)
+pub fn default_level_chunk_with_light_packet() {
+  LevelChunkWithLightPacket(
+    x: 0,
+    z: 0,
+    height_maps: <<0x0A, 0x00>>,
+    sections: chunk.default_chunk(),
+    block_entities: [],
+    sky_light_mask: [],
+    block_light_mask: [],
+    empty_sky_light_mask: [],
+    empty_block_light_mask: [],
+    sky_light_arrays: [],
+    block_light_arrays: [],
+  )
+}
 
-pub const default_level_chunk_with_light = LevelChunkWithLight(
-  default_level_chunk_with_light_packet,
-)
+pub fn default_level_chunk_with_light() {
+  LevelChunkWithLight(default_level_chunk_with_light_packet())
+}
 
 fn encode_level_chunk_with_light(
   tree: BytesTree,

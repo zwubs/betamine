@@ -240,7 +240,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           game_event: game_event.WaitForChunks,
         )),
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
-        clientbound.default_level_chunk_with_light,
+        clientbound.default_level_chunk_with_light(),
         clientbound.SynchronizePlayerPosition(
           clientbound.SynchronizePlayerPositionPacket(
             entity.position,
