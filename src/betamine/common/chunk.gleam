@@ -1,7 +1,9 @@
 import betamine/protocol/encoder
 import gleam/bytes_tree.{type BytesTree}
+import gleam/float
 import gleam/int
 import gleam/list
+import gleam/result
 
 pub fn default_chunk() {
   [
@@ -60,6 +62,20 @@ pub fn default_direct_chunk_section() {
   )
 }
 
+pub fn default_indirect_chunk_section() {
+  ChunkSection(
+    block_count: 4096,
+    block_states: PalettedContainer(
+      Indirect([0, 1, 15]),
+      list.append(
+        list.range(1, { 4096 - 256 }) |> list.map(fn(_) { 0 }),
+        list.range(1, 256) |> list.index_map(fn(_, index) { index % 2 + 1 }),
+      ),
+    ),
+    biomes: PalettedContainer(SingleValued(0), []),
+  )
+}
+
 pub const default_empty_chunk_section = ChunkSection(
   block_count: 0,
   block_states: PalettedContainer(SingleValued(0), []),
@@ -87,6 +103,10 @@ const bits_per_long = 64
 
 const bits_per_direct_entry = 15
 
+const min_bits_per_indirect_entry = 4
+
+const max_bits_per_indirect_entry = 8
+
 fn encode_paletted_container(
   tree: BytesTree,
   paletted_container: PalettedContainer,
@@ -99,7 +119,24 @@ fn encode_paletted_container(
       |> encoder.var_int(id)
       |> encoder.var_int(0)
     }
-    Indirect(_) -> todo as "Indirect palettes not implemented"
+    Indirect(palette) -> {
+      let bits_per_indirect_entry =
+        int.clamp(
+          float.truncate(result.unwrap(
+            int.power(2, int.to_float(list.length(palette))),
+            0.0,
+          )),
+          min_bits_per_indirect_entry,
+          max_bits_per_indirect_entry,
+        )
+      tree
+      |> encoder.byte(bits_per_indirect_entry)
+      |> encoder.array(palette, encoder.var_int)
+      |> encoder.array(
+        pack_data(data, bits_per_indirect_entry, []),
+        encoder.long,
+      )
+    }
     Direct -> {
       tree
       |> encoder.byte(bits_per_direct_entry)

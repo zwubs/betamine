@@ -5,7 +5,6 @@ import gleam/io
 
 pub fn main() {
   let assert Ok(game_subject) = game.start()
-  echo game_subject
   let assert Ok(_) = host.start(game_subject)
   io.println("Betamine listening on port: 25565")
   process.sleep_forever()
