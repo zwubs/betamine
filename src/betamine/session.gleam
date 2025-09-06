@@ -187,6 +187,15 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.FeatureFlags(
           clientbound.FeatureFlagsPacket([#("minecraft", "vanilla")]),
         ),
+        clientbound.UpdateTags(
+          clientbound.UpdateTagsPacket([
+            #(#("minecraft", "fluid"), [
+              // References to the minecraft:fluid registry
+              #(#("minecraft", "lava"), [3, 4]),
+              #(#("minecraft", "water"), [1, 2]),
+            ]),
+          ]),
+        ),
         clientbound.KnownDataPacks(
           clientbound.KnownDataPacksPacket([
             clientbound.KnownDataPack(
