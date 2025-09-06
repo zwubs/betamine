@@ -27,6 +27,7 @@ pub type Packet {
   LoginSuccess(packet: LoginSuccessPacket)
   Plugin(packet: PluginPacket)
   FeatureFlags(packet: FeatureFlagsPacket)
+  UpdateTags(packet: UpdateTagsPacket)
   KnownDataPacks(packet: KnownDataPacksPacket)
   Registry(packet: RegistryPacket)
   FinishConfiguration
@@ -73,6 +74,10 @@ pub fn encode(packet: Packet) -> BytesTree {
     FeatureFlags(packet) -> {
       bytes_tree.from_bit_array(<<0x0C>>)
       |> encode_feature_flags(packet)
+    }
+    UpdateTags(packet) -> {
+      bytes_tree.from_bit_array(<<0x0D>>)
+      |> encode_update_tags(packet)
     }
     KnownDataPacks(packet) -> {
       bytes_tree.from_bit_array(<<0x0E>>)
@@ -233,6 +238,28 @@ pub type FeatureFlagsPacket {
 
 fn encode_feature_flags(tree: BytesTree, packet: FeatureFlagsPacket) {
   encoder.array(tree, packet.flags, common.encode_identifier)
+}
+
+pub type UpdateTagsPacket {
+  UpdateTagsPacket(
+    registries: List(
+      #(identifier.Identifier, List(#(identifier.Identifier, List(Int)))),
+    ),
+  )
+}
+
+fn encode_update_tags(tree: BytesTree, packet: UpdateTagsPacket) {
+  encoder.array(tree, packet.registries, fn(tree, registry) {
+    let #(registry_identifier, tags) = registry
+    tree
+    |> encoder.string(identifier.to_string(registry_identifier))
+    |> encoder.array(tags, fn(tree, tag) {
+      let #(identifier, values) = tag
+      tree
+      |> encoder.string(identifier.to_string(identifier))
+      |> encoder.array(values, encoder.var_int)
+    })
+  })
 }
 
 pub type KnownDataPacksPacket {
@@ -397,23 +424,25 @@ pub type LevelChunkWithLightPacket {
   )
 }
 
-pub const default_level_chunk_with_light_packet = LevelChunkWithLightPacket(
-  x: 0,
-  z: 0,
-  height_maps: <<0x0A, 0x00>>,
-  sections: chunk.default_chunk,
-  block_entities: [],
-  sky_light_mask: [],
-  block_light_mask: [],
-  empty_sky_light_mask: [],
-  empty_block_light_mask: [],
-  sky_light_arrays: [],
-  block_light_arrays: [],
-)
+pub fn default_level_chunk_with_light_packet() {
+  LevelChunkWithLightPacket(
+    x: 0,
+    z: 0,
+    height_maps: <<0x0A, 0x00>>,
+    sections: chunk.default_chunk(),
+    block_entities: [],
+    sky_light_mask: [],
+    block_light_mask: [],
+    empty_sky_light_mask: [],
+    empty_block_light_mask: [],
+    sky_light_arrays: [],
+    block_light_arrays: [],
+  )
+}
 
-pub const default_level_chunk_with_light = LevelChunkWithLight(
-  default_level_chunk_with_light_packet,
-)
+pub fn default_level_chunk_with_light() {
+  LevelChunkWithLight(default_level_chunk_with_light_packet())
+}
 
 fn encode_level_chunk_with_light(
   tree: BytesTree,

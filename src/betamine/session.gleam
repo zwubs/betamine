@@ -187,6 +187,15 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.FeatureFlags(
           clientbound.FeatureFlagsPacket([#("minecraft", "vanilla")]),
         ),
+        clientbound.UpdateTags(
+          clientbound.UpdateTagsPacket([
+            #(#("minecraft", "fluid"), [
+              // References to the minecraft:fluid registry
+              #(#("minecraft", "lava"), [3, 4]),
+              #(#("minecraft", "water"), [1, 2]),
+            ]),
+          ]),
+        ),
         clientbound.KnownDataPacks(
           clientbound.KnownDataPacksPacket([
             clientbound.KnownDataPack(
@@ -240,7 +249,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           game_event: game_event.WaitForChunks,
         )),
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
-        clientbound.default_level_chunk_with_light,
         clientbound.SynchronizePlayerPosition(
           clientbound.SynchronizePlayerPositionPacket(
             entity.position,
@@ -249,6 +257,17 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             0,
           ),
         ),
+        ..list.map(list.range(0, 8), fn(index) {
+          let assert clientbound.LevelChunkWithLight(packet) =
+            clientbound.default_level_chunk_with_light()
+          clientbound.LevelChunkWithLight(
+            clientbound.LevelChunkWithLightPacket(
+              ..packet,
+              x: index % 3 - 1,
+              z: index / 3 - 1,
+            ),
+          )
+        })
       ])
 
       process.call(state.game_subject, 1000, command.GetAllPlayers)
@@ -338,9 +357,7 @@ fn send(state: State, packets: List(clientbound.Packet)) {
     <> string.inspect(state.phase)
 
   list.each(packets, fn(packet) {
-    // echo packet
     let encoded_packet = protocol.encode_clientbound(packet)
-    // echo bit_array.inspect(bytes_tree.to_bit_array(encoded_packet))
     let assert Ok(Nil) = glisten.send(state.connection, encoded_packet)
   })
 }
