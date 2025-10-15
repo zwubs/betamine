@@ -1,20 +1,23 @@
+import betamine/common/block/block_state
 import betamine/common/chat/chat_session
-import betamine/common/chunk
 import betamine/common/difficulty.{type Difficulty}
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
 import betamine/common/entity/player/player_game_mode
 import betamine/common/identifier
+import betamine/common/position
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
 import betamine/common/uuid
 import betamine/common/vector3.{type Vector3}
 import betamine/constants
 import betamine/protocol/common
+import betamine/protocol/common/chunk
 import betamine/protocol/common/entity/entity_metadata
 import betamine/protocol/common/game_event
 import betamine/protocol/encoder
 import gleam/bytes_tree.{type BytesTree}
+import gleam/function
 import gleam/int
 import gleam/json
 import gleam/list
@@ -47,107 +50,75 @@ pub type Packet {
   PlayKeepAlive(packet: PlayKeepAlivePacket)
   SetEntityMetadata(packet: SetEntityMetadataPacket)
   AnimateEntity(packet: AnimateEntityPacket)
+  AcknowledgeBlockChange(packet: AcknowledgeBlockChangePacket)
+  BlockUpdate(packet: BlockUpdatePacket)
+}
+
+fn get_packet_id(packet: Packet) -> Int {
+  case packet {
+    StatusResponse(..) -> 0x00
+    StatusPong(..) -> 0x01
+    LoginSuccess(..) -> 0x02
+    Plugin(..) -> 0x01
+    Registry(..) -> 0x07
+    FeatureFlags(..) -> 0x0C
+    UpdateTags(..) -> 0x0D
+    KnownDataPacks(..) -> 0x0E
+    FinishConfiguration -> 0x03
+    Login(..) -> 0x2B
+    ChangeDifficulty(..) -> 0x0B
+    GameEvent(..) -> 0x22
+    SetCenterChunk(..) -> 0x54
+    LevelChunkWithLight(..) -> 0x27
+    PlayerInfoRemove(..) -> 0x3D
+    PlayerInfoUpdate(..) -> 0x3E
+    SynchronizePlayerPosition(..) -> 0x40
+    SpawnEntity(..) -> 0x01
+    UpdateEntityPosition(..) -> 0x2E
+    UpdateEntityRotation(..) -> 0x30
+    SetHeadRotation(..) -> 0x48
+    RemoveEntities(..) -> 0x42
+    PlayKeepAlive(..) -> 0x26
+    SetEntityMetadata(..) -> 0x58
+    AnimateEntity(..) -> 0x03
+    AcknowledgeBlockChange(..) -> 0x05
+    BlockUpdate(..) -> 0x09
+  }
 }
 
 pub fn encode(packet: Packet) -> BytesTree {
-  case packet {
-    StatusResponse(packet) -> {
-      bytes_tree.from_bit_array(<<0x00>>)
-      |> encode_status_response(packet)
-    }
-    StatusPong(packet) -> {
-      bytes_tree.from_bit_array(<<0x01>>)
-      |> encode_status_pong(packet)
-    }
-    LoginSuccess(packet) -> {
-      bytes_tree.from_bit_array(<<0x02>>)
-      |> encode_login_success(packet)
-    }
-    Plugin(packet) -> {
-      bytes_tree.from_bit_array(<<0x01>>)
-      |> encode_plugin(packet)
-    }
-    Registry(packet) -> {
-      bytes_tree.from_bit_array(<<0x07>>)
-      |> encode_registry(packet)
-    }
-    FeatureFlags(packet) -> {
-      bytes_tree.from_bit_array(<<0x0C>>)
-      |> encode_feature_flags(packet)
-    }
-    UpdateTags(packet) -> {
-      bytes_tree.from_bit_array(<<0x0D>>)
-      |> encode_update_tags(packet)
-    }
-    KnownDataPacks(packet) -> {
-      bytes_tree.from_bit_array(<<0x0E>>)
-      |> encode_known_data_packs(packet)
-    }
-    FinishConfiguration -> bytes_tree.from_bit_array(<<0x03>>)
-    Login(packet) -> {
-      bytes_tree.from_bit_array(<<0x2B>>)
-      |> encode_login(packet)
-    }
-    ChangeDifficulty(packet) -> {
-      bytes_tree.from_bit_array(<<0x0B>>)
-      |> encode_change_difficulty(packet)
-    }
-    GameEvent(packet) -> {
-      bytes_tree.from_bit_array(<<0x22>>)
-      |> encode_game_event(packet)
-    }
-    SetCenterChunk(packet) -> {
-      bytes_tree.from_bit_array(<<0x54>>)
-      |> encode_set_center_chunk(packet)
-    }
-    LevelChunkWithLight(packet) -> {
-      bytes_tree.from_bit_array(<<0x27>>)
-      |> encode_level_chunk_with_light(packet)
-    }
-    PlayerInfoRemove(packet) -> {
-      bytes_tree.from_bit_array(<<0x3D>>)
-      |> encode_player_info_remove(packet)
-    }
-    PlayerInfoUpdate(packet) -> {
-      bytes_tree.from_bit_array(<<0x3E>>)
-      |> encode_player_info_update(packet)
-    }
-    SynchronizePlayerPosition(packet) -> {
-      bytes_tree.from_bit_array(<<0x40>>)
-      |> encode_synchronize_player_position(packet)
-    }
-    SpawnEntity(packet) -> {
-      bytes_tree.from_bit_array(<<0x01>>)
-      |> encode_spawn_entity(packet)
-    }
-    UpdateEntityPosition(packet) -> {
-      bytes_tree.from_bit_array(<<0x2E>>)
-      |> encode_update_entity_position(packet)
-    }
-    UpdateEntityRotation(packet) -> {
-      bytes_tree.from_bit_array(<<0x30>>)
-      |> encode_update_entity_rotation(packet)
-    }
-    SetHeadRotation(packet) -> {
-      bytes_tree.from_bit_array(<<0x48>>)
-      |> encode_set_head_rotation(packet)
-    }
-    RemoveEntities(packet) -> {
-      bytes_tree.from_bit_array(<<0x42>>)
-      |> encode_remove_entities(packet)
-    }
-    PlayKeepAlive(packet) -> {
-      bytes_tree.from_bit_array(<<0x26>>)
-      |> encode_play_keep_alive(packet)
-    }
-    SetEntityMetadata(packet) -> {
-      bytes_tree.from_bit_array(<<0x58>>)
-      |> encode_set_entity_metadata(packet)
-    }
-    AnimateEntity(packet) -> {
-      bytes_tree.from_bit_array(<<0x03>>)
-      |> encode_animate_entity(packet)
-    }
+  encoder.var_int(bytes_tree.new(), get_packet_id(packet))
+  |> case packet {
+    StatusResponse(packet) -> encode_status_response(_, packet)
+    StatusPong(packet) -> encode_status_pong(_, packet)
+    LoginSuccess(packet) -> encode_login_success(_, packet)
+    Plugin(packet) -> encode_plugin(_, packet)
+    Registry(packet) -> encode_registry(_, packet)
+    FeatureFlags(packet) -> encode_feature_flags(_, packet)
+    UpdateTags(packet) -> encode_update_tags(_, packet)
+    KnownDataPacks(packet) -> encode_known_data_packs(_, packet)
+    FinishConfiguration -> function.identity
+    Login(packet) -> encode_login(_, packet)
+    ChangeDifficulty(packet) -> encode_change_difficulty(_, packet)
+    GameEvent(packet) -> encode_game_event(_, packet)
+    SetCenterChunk(packet) -> encode_set_center_chunk(_, packet)
+    LevelChunkWithLight(packet) -> encode_level_chunk_with_light(_, packet)
+    PlayerInfoRemove(packet) -> encode_player_info_remove(_, packet)
+    PlayerInfoUpdate(packet) -> encode_player_info_update(_, packet)
+    SynchronizePlayerPosition(packet) -> encode_synchronize_player_position(
+      _,
+      packet,
+    )
+    SpawnEntity(packet) -> encode_spawn_entity(_, packet)
+    UpdateEntityPosition(packet) -> encode_update_entity_position(_, packet)
+    UpdateEntityRotation(packet) -> encode_update_entity_rotation(_, packet)
+    SetHeadRotation(packet) -> encode_set_head_rotation(_, packet)
+    RemoveEntities(packet) -> encode_remove_entities(_, packet)
+    PlayKeepAlive(packet) -> encode_play_keep_alive(_, packet)
+    SetEntityMetadata(packet) -> encode_set_entity_metadata(_, packet)
+    AnimateEntity(packet) -> encode_animate_entity(_, packet)
+    AcknowledgeBlockChange(packet) -> encode_acknowledge_block_change(_, packet)
+    BlockUpdate(packet) -> encode_block_update(_, packet)
   }
 }
 
@@ -413,7 +384,7 @@ pub type LevelChunkWithLightPacket {
     x: Int,
     z: Int,
     height_maps: BitArray,
-    sections: List(chunk.ChunkSection),
+    chunk: chunk.Chunk,
     block_entities: List(Nil),
     sky_light_mask: List(Int),
     block_light_mask: List(Int),
@@ -429,7 +400,7 @@ pub fn default_level_chunk_with_light_packet() {
     x: 0,
     z: 0,
     height_maps: <<0x0A, 0x00>>,
-    sections: chunk.default_chunk(),
+    chunk: chunk.default(),
     block_entities: [],
     sky_light_mask: [],
     block_light_mask: [],
@@ -448,37 +419,28 @@ fn encode_level_chunk_with_light(
   tree: BytesTree,
   packet: LevelChunkWithLightPacket,
 ) {
-  let header =
-    bytes_tree.new()
-    |> encoder.int(packet.x)
-    |> encoder.int(packet.z)
-    |> encoder.raw(packet.height_maps)
-  let data =
-    bytes_tree.new()
-    |> encoder.raw_array(packet.sections, chunk.encode_section)
-  let data_size =
-    bytes_tree.new()
-    |> encoder.var_int(bytes_tree.byte_size(data))
-  let footer =
-    bytes_tree.new()
-    |> encoder.array(packet.block_entities, fn(_, _) {
-      todo as "Encode block entities"
-    })
-    |> encoder.array(packet.sky_light_mask, fn(_, _) {
-      todo as "Encode sky light mask"
-    })
-    |> encoder.array(packet.block_light_mask, fn(_, _) {
-      todo as "Encode block light mask"
-    })
-    |> encoder.array(packet.empty_sky_light_mask, fn(_, _) {
-      todo as "Encode empty sky light mask"
-    })
-    |> encoder.array(packet.empty_block_light_mask, fn(_, _) {
-      todo as "Encode empty block light mask"
-    })
-    |> encoder.array(packet.sky_light_arrays, encoder.byte_array)
-    |> encoder.array(packet.block_light_arrays, encoder.byte_array)
-  bytes_tree.concat([tree, header, data_size, data, footer])
+  tree
+  |> encoder.int(packet.x)
+  |> encoder.int(packet.z)
+  |> encoder.raw(packet.height_maps)
+  |> chunk.encode(packet.chunk)
+  |> encoder.array(packet.block_entities, fn(_, _) {
+    todo as "Encode block entities"
+  })
+  |> encoder.array(packet.sky_light_mask, fn(_, _) {
+    todo as "Encode sky light mask"
+  })
+  |> encoder.array(packet.block_light_mask, fn(_, _) {
+    todo as "Encode block light mask"
+  })
+  |> encoder.array(packet.empty_sky_light_mask, fn(_, _) {
+    todo as "Encode empty sky light mask"
+  })
+  |> encoder.array(packet.empty_block_light_mask, fn(_, _) {
+    todo as "Encode empty block light mask"
+  })
+  |> encoder.array(packet.sky_light_arrays, encoder.byte_array)
+  |> encoder.array(packet.block_light_arrays, encoder.byte_array)
 }
 
 pub type SynchronizePlayerPositionPacket {
@@ -720,4 +682,28 @@ pub fn encode_animate_entity(tree: BytesTree, packet: AnimateEntityPacket) {
   tree
   |> encoder.var_int(packet.entity_id)
   |> encoder.byte(entity_animation.to_int(packet.animation))
+}
+
+pub type AcknowledgeBlockChangePacket {
+  AcknowledgeBlockChangePacket(sequence: Int)
+}
+
+pub fn encode_acknowledge_block_change(
+  tree: BytesTree,
+  packet: AcknowledgeBlockChangePacket,
+) {
+  tree |> encoder.var_int(packet.sequence)
+}
+
+pub type BlockUpdatePacket {
+  BlockUpdatePacket(
+    position: position.Position,
+    block_state: block_state.BlockState,
+  )
+}
+
+pub fn encode_block_update(tree: BytesTree, packet: BlockUpdatePacket) {
+  tree
+  |> encoder.position(packet.position)
+  |> encoder.block_state(packet.block_state)
 }
