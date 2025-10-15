@@ -12,7 +12,7 @@ pub fn bit_size(x: BitArray) -> Int
 const int32_mask = 0xFFFFFFFF
 
 pub fn var_int(bit_array: BitArray) -> DecodeResult(Int) {
-  use #(int, bit_array) <- result.then(var_int_accumulator(bit_array, 0, 0))
+  use #(int, bit_array) <- result.try(var_int_accumulator(bit_array, 0, 0))
   let most_significant_bit = int.bitwise_shift_right(int, 31)
   let signed_int = case most_significant_bit {
     1 -> { int.bitwise_exclusive_or(int, int32_mask) + 1 } * -1
