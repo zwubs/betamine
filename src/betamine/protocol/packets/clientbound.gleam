@@ -390,24 +390,27 @@ pub type LevelChunkWithLightPacket {
     block_light_mask: List(Int),
     empty_sky_light_mask: List(Int),
     empty_block_light_mask: List(Int),
-    sky_light_arrays: List(BitArray),
-    block_light_arrays: List(BitArray),
+    sky_light_arrays: List(List(Int)),
+    block_light_arrays: List(List(Int)),
   )
 }
 
 pub fn default_level_chunk_with_light_packet() {
+  let sky_light_array = list.range(1, 2048) |> list.map(fn(_) { 0xFF })
+  let block_light_array = sky_light_array |> list.map(fn(_) { 0x0 })
   LevelChunkWithLightPacket(
     x: 0,
     z: 0,
     height_maps: <<0x0A, 0x00>>,
     chunk: chunk.default(),
     block_entities: [],
-    sky_light_mask: [],
+    sky_light_mask: [0b11111111111111111111111111],
     block_light_mask: [],
     empty_sky_light_mask: [],
     empty_block_light_mask: [],
-    sky_light_arrays: [],
-    block_light_arrays: [],
+    sky_light_arrays: list.range(1, 26) |> list.map(fn(_) { sky_light_array }),
+    block_light_arrays: list.range(1, 26)
+      |> list.map(fn(_) { block_light_array }),
   )
 }
 
@@ -427,20 +430,16 @@ fn encode_level_chunk_with_light(
   |> encoder.array(packet.block_entities, fn(_, _) {
     todo as "Encode block entities"
   })
-  |> encoder.array(packet.sky_light_mask, fn(_, _) {
-    todo as "Encode sky light mask"
+  |> encoder.array(packet.sky_light_mask, encoder.long)
+  |> encoder.array(packet.block_light_mask, encoder.long)
+  |> encoder.array(packet.empty_sky_light_mask, encoder.long)
+  |> encoder.array(packet.empty_block_light_mask, encoder.long)
+  |> encoder.array(packet.sky_light_arrays, fn(tree, sky_light_array) {
+    encoder.array(tree, sky_light_array, encoder.byte)
   })
-  |> encoder.array(packet.block_light_mask, fn(_, _) {
-    todo as "Encode block light mask"
+  |> encoder.array(packet.block_light_arrays, fn(tree, sky_light_array) {
+    encoder.array(tree, sky_light_array, encoder.byte)
   })
-  |> encoder.array(packet.empty_sky_light_mask, fn(_, _) {
-    todo as "Encode empty sky light mask"
-  })
-  |> encoder.array(packet.empty_block_light_mask, fn(_, _) {
-    todo as "Encode empty block light mask"
-  })
-  |> encoder.array(packet.sky_light_arrays, encoder.byte_array)
-  |> encoder.array(packet.block_light_arrays, encoder.byte_array)
 }
 
 pub type SynchronizePlayerPositionPacket {
