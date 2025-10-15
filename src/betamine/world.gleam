@@ -18,7 +18,7 @@ pub fn generate() {
     list.range({ world_chunk_half_length * -1 }, world_chunk_half_length - 1)
   let world_chunk_section_range =
     list.range(0, mc_world_chunk_section_height - 1)
-  let block_range = list.range(0, 15)
+  let relative_range = list.range(0, 15)
 
   let empty_data = iv.initialise(16 * 16 * 16, fn(_) { block_state.Air })
 
@@ -28,9 +28,9 @@ pub fn generate() {
         world_chunk_section_range,
         [],
         fn(chunk_sections, chunk_section_y) {
-          list.fold(block_range, empty_data, fn(array, relative_x) {
+          list.fold(relative_range, empty_data, fn(array, relative_x) {
             let global_x = chunk_x * 16 + relative_x
-            list.fold(block_range, array, fn(array, relative_z) {
+            list.fold(relative_range, array, fn(array, relative_z) {
               let global_z = chunk_z * 16 + relative_z
               let terrain_y =
                 float.truncate(
@@ -38,7 +38,7 @@ pub fn generate() {
                   *. maths.sin(int.to_float(global_z) /. 16.0)
                   *. 8.0,
                 )
-              list.fold(block_range, array, fn(array, relative_y) {
+              list.fold(relative_range, array, fn(array, relative_y) {
                 let global_y = { chunk_section_y - 4 } * 16 + relative_y
                 let index = relative_y * 256 + relative_z * 16 + relative_x
                 case global_y {
@@ -82,7 +82,12 @@ fn convert_data_to_chunk_section(
 ) -> chunk_section.ChunkSection {
   chunk_section.ChunkSection(
     ..chunk_section.empty,
-    block_count: 256,
+    block_count: iv.fold(data, 0, fn(block_count, block_state) {
+      case block_state {
+        block_state.Air -> block_count
+        _ -> block_count + 1
+      }
+    }),
     block_states: paletted_container.PalettedContainer(
       data: iv.map(data, block_state.to_int) |> iv.to_list,
       palette: chunk_section.direct_block_palette(),
