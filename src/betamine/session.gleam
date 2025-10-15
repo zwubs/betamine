@@ -16,6 +16,7 @@ import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import betamine/protocol/registry
+import betamine/world
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/list
@@ -257,17 +258,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             0,
           ),
         ),
-        ..list.map(list.range(0, 8), fn(index) {
-          let assert clientbound.LevelChunkWithLight(packet) =
-            clientbound.default_level_chunk_with_light()
-          clientbound.LevelChunkWithLight(
-            clientbound.LevelChunkWithLightPacket(
-              ..packet,
-              x: index % 3 - 1,
-              z: index / 3 - 1,
-            ),
-          )
-        })
+        ..world.generate()
       ])
 
       process.call(state.game_subject, 1000, command.GetAllPlayers)

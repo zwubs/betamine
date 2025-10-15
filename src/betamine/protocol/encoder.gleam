@@ -1,3 +1,4 @@
+import betamine/common/block/block_state
 import betamine/common/identifier
 import betamine/common/position
 import betamine/common/vector3.{type Vector3}
@@ -140,4 +141,8 @@ fn bitmask_to_int(bitmask: List(Bool), accumulator: Int) {
     }
     [] -> int.bitwise_and(accumulator, 0b111111111)
   }
+}
+
+pub fn block_state(tree: BytesTree, block_state: block_state.BlockState) {
+  tree |> var_int(block_state.to_int(block_state))
 }
