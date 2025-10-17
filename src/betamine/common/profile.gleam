@@ -33,10 +33,3 @@ pub fn decoder() {
   use properties <- decode.field("properties", decode.list(property_decoder()))
   decode.success(Profile(id:, name:, properties:))
 }
-
-pub fn encode_property(tree: BytesTree, property: ProfileProperty) {
-  tree
-  |> encoder.string(property.name)
-  |> encoder.string(property.value)
-  |> encoder.optional(property.signature, encoder.string)
-}

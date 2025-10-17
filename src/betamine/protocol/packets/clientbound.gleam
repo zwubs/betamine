@@ -177,20 +177,11 @@ fn encode_status_pong(tree: BytesTree, packet: StatusPongPacket) {
 }
 
 pub type LoginSuccessPacket {
-  LoginSuccessPacket(
-    uuid: uuid.Uuid,
-    username: String,
-    properties: List(profile.ProfileProperty),
-    strict_error_handling: Bool,
-  )
+  LoginSuccessPacket(profile: profile.Profile)
 }
 
 fn encode_login_success(tree: BytesTree, packet: LoginSuccessPacket) {
-  tree
-  |> common.encode_uuid(packet.uuid)
-  |> encoder.string(packet.username)
-  |> encoder.array(packet.properties, profile.encode_property)
-  |> encoder.bool(packet.strict_error_handling)
+  common.encode_profile(tree, packet.profile)
 }
 
 pub type PluginPacket {
@@ -541,14 +532,9 @@ fn encode_player_info_update_entry(
   entry: PlayerInfoUpdateEntry,
   actions: set.Set(PlayerInfoUpdateAction),
 ) {
-  let tree = common.encode_uuid(tree, entry.uuid)
   let tree = case set.contains(actions, AddPlayer) {
-    True -> {
-      tree
-      |> encoder.string(entry.name)
-      |> encoder.array(entry.profile.properties, profile.encode_property)
-    }
-    False -> tree
+    True -> common.encode_profile(tree, entry.profile)
+    False -> common.encode_uuid(tree, entry.uuid)
   }
   let tree = case set.contains(actions, InitializeChat) {
     True -> encoder.optional(tree, entry.chat_session, chat_session.encode)

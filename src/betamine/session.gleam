@@ -172,12 +172,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.LoginStart(packet) -> {
       let assert Ok(profile) = mojang.fetch_profile(packet.uuid)
       send(state, [
-        clientbound.LoginSuccess(clientbound.LoginSuccessPacket(
-          username: packet.name,
-          uuid: packet.uuid,
-          properties: profile.properties,
-          strict_error_handling: False,
-        )),
+        clientbound.LoginSuccess(clientbound.LoginSuccessPacket(profile)),
       ])
       Ok(State(..state, profile:, uuid: packet.uuid))
     }
