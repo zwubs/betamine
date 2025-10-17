@@ -7,9 +7,9 @@ pub const default_host_port = 25_565
 pub const mojang_base_profile_url = "https://sessionserver.mojang.com/session/minecraft/profile/"
 
 // Minecraft Constants
-pub const mc_version_name = "1.21.1"
+pub const mc_version_name = "1.21.10"
 
-pub const mc_version_protocol = 767
+pub const mc_version_protocol = 773
 
 pub const mc_max_player_count = 10
 
