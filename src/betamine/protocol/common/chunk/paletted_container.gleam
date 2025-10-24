@@ -28,7 +28,6 @@ pub fn encode(tree: bytes_tree.BytesTree, paletted_container: PalettedContainer)
       tree
       |> encoder.byte(0)
       |> encoder.var_int(id)
-      |> encoder.var_int(0)
     }
     IndirectPalette(palette, min_bit_count, max_bit_count) -> {
       let bits_per_indirect_entry =
@@ -43,7 +42,7 @@ pub fn encode(tree: bytes_tree.BytesTree, paletted_container: PalettedContainer)
       tree
       |> encoder.byte(bits_per_indirect_entry)
       |> encoder.array(palette, encoder.var_int)
-      |> encoder.array(
+      |> encoder.raw_array(
         pack_data(data, bits_per_indirect_entry, []),
         encoder.long,
       )
@@ -51,7 +50,7 @@ pub fn encode(tree: bytes_tree.BytesTree, paletted_container: PalettedContainer)
     DirectPalette(bits_per_entry:) -> {
       tree
       |> encoder.byte(bits_per_entry)
-      |> encoder.array(pack_data(data, bits_per_entry, []), encoder.long)
+      |> encoder.raw_array(pack_data(data, bits_per_entry, []), encoder.long)
     }
   }
 }
