@@ -216,8 +216,8 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     serverbound.KnownDataPacks(_) -> {
       // Finish Configuration
-      registry.send(state.connection)
-      let _ = send(state, [clientbound.FinishConfiguration])
+      send(state, registry.get_packets())
+      send(state, [clientbound.FinishConfiguration])
       Ok(state)
     }
     // Acknowledge Finish Configuration
@@ -247,9 +247,10 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
         clientbound.SynchronizePlayerPosition(
           clientbound.SynchronizePlayerPositionPacket(
-            entity.position,
-            entity.rotation,
             0,
+            entity.position,
+            entity.velocity,
+            entity.rotation,
             0,
           ),
         ),

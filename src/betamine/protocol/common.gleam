@@ -9,18 +9,26 @@ import gleam/float
 import gleam/result
 import gleam/string
 
+pub fn encode_vector3(
+  tree: BytesTree,
+  vector3: Vector3(a),
+  encoder: fn(BytesTree, a) -> BytesTree,
+) {
+  vector3.fold(vector3, tree, encoder)
+}
+
 pub fn encode_velocity(tree: BytesTree, velocity: Vector3(Float)) {
   velocity
   |> vector3.map(fn(value) { float.clamp(value, -3.9, 3.9) *. 8000.0 })
   |> vector3.truncate
-  |> vector3.fold(tree, encoder.short)
+  |> encode_vector3(tree, _, encoder.short)
 }
 
 pub fn encode_delta(tree: BytesTree, delta: Vector3(Float)) {
   delta
   |> vector3.map(fn(value) { value *. 4096.0 })
   |> vector3.truncate
-  |> vector3.fold(tree, encoder.short)
+  |> encode_vector3(tree, _, encoder.short)
 }
 
 pub fn encode_uuid(tree: BytesTree, uuid: uuid.Uuid) {

@@ -56,33 +56,33 @@ pub type Packet {
 
 fn get_packet_id(packet: Packet) -> Int {
   case packet {
-    StatusResponse(..) -> 0x00
-    StatusPong(..) -> 0x01
-    LoginSuccess(..) -> 0x02
-    Plugin(..) -> 0x01
-    Registry(..) -> 0x07
-    FeatureFlags(..) -> 0x0C
-    UpdateTags(..) -> 0x0D
-    KnownDataPacks(..) -> 0x0E
-    FinishConfiguration -> 0x03
-    Login(..) -> 0x2B
-    ChangeDifficulty(..) -> 0x0B
-    GameEvent(..) -> 0x22
-    SetCenterChunk(..) -> 0x54
-    LevelChunkWithLight(..) -> 0x27
-    PlayerInfoRemove(..) -> 0x3D
-    PlayerInfoUpdate(..) -> 0x3E
-    SynchronizePlayerPosition(..) -> 0x40
-    SpawnEntity(..) -> 0x01
-    UpdateEntityPosition(..) -> 0x2E
-    UpdateEntityRotation(..) -> 0x30
-    SetHeadRotation(..) -> 0x48
-    RemoveEntities(..) -> 0x42
-    PlayKeepAlive(..) -> 0x26
-    SetEntityMetadata(..) -> 0x58
-    AnimateEntity(..) -> 0x03
-    AcknowledgeBlockChange(..) -> 0x05
-    BlockUpdate(..) -> 0x09
+    StatusResponse(..) -> 0
+    StatusPong(..) -> 1
+    LoginSuccess(..) -> 2
+    Plugin(..) -> 1
+    Registry(..) -> 7
+    FeatureFlags(..) -> 12
+    UpdateTags(..) -> 13
+    KnownDataPacks(..) -> 14
+    FinishConfiguration -> 3
+    Login(..) -> 48
+    ChangeDifficulty(..) -> 10
+    GameEvent(..) -> 38
+    SetCenterChunk(..) -> 92
+    LevelChunkWithLight(..) -> 44
+    PlayerInfoRemove(..) -> 67
+    PlayerInfoUpdate(..) -> 68
+    SynchronizePlayerPosition(..) -> 70
+    SpawnEntity(..) -> 1
+    UpdateEntityPosition(..) -> 51
+    UpdateEntityRotation(..) -> 54
+    SetHeadRotation(..) -> 81
+    RemoveEntities(..) -> 75
+    PlayKeepAlive(..) -> 27
+    SetEntityMetadata(..) -> 97
+    AnimateEntity(..) -> 2
+    AcknowledgeBlockChange(..) -> 4
+    BlockUpdate(..) -> 8
   }
 }
 
@@ -283,6 +283,7 @@ pub type LoginPacket {
     is_flat: Bool,
     death_location: Option(DeathLocation),
     portal_cooldown: Int,
+    sea_level: Int,
     enforce_secure_chat: Bool,
   )
 }
@@ -306,6 +307,7 @@ pub const default_login = LoginPacket(
   is_flat: False,
   death_location: None,
   portal_cooldown: 0,
+  sea_level: 0,
   enforce_secure_chat: False,
 )
 
@@ -329,6 +331,7 @@ pub fn encode_login(tree: BytesTree, packet: LoginPacket) {
   |> encoder.bool(packet.is_flat)
   |> encoder.optional(packet.death_location, encode_death_location)
   |> encoder.var_int(packet.portal_cooldown)
+  |> encoder.var_int(packet.sea_level)
   |> encoder.bool(packet.enforce_secure_chat)
 }
 
@@ -374,7 +377,7 @@ pub type LevelChunkWithLightPacket {
   LevelChunkWithLightPacket(
     x: Int,
     z: Int,
-    height_maps: BitArray,
+    heightmaps: List(Nil),
     chunk: chunk.Chunk,
     block_entities: List(Nil),
     sky_light_mask: List(Int),
@@ -392,7 +395,7 @@ pub fn default_level_chunk_with_light_packet() {
   LevelChunkWithLightPacket(
     x: 0,
     z: 0,
-    height_maps: <<0x0A, 0x00>>,
+    heightmaps: [],
     chunk: chunk.default(),
     block_entities: [],
     sky_light_mask: [0b11111111111111111111111111],
@@ -416,7 +419,7 @@ fn encode_level_chunk_with_light(
   tree
   |> encoder.int(packet.x)
   |> encoder.int(packet.z)
-  |> encoder.raw(packet.height_maps)
+  |> encoder.array(packet.heightmaps, fn(_, _) { todo as "Encode heightmaps" })
   |> chunk.encode(packet.chunk)
   |> encoder.array(packet.block_entities, fn(_, _) {
     todo as "Encode block entities"
@@ -435,10 +438,11 @@ fn encode_level_chunk_with_light(
 
 pub type SynchronizePlayerPositionPacket {
   SynchronizePlayerPositionPacket(
+    teleport_id: Int,
     position: Vector3(Float),
+    velocity: Vector3(Float),
     rotation: Rotation,
     flags: Int,
-    teleport_id: Int,
   )
 }
 
@@ -447,13 +451,12 @@ pub fn encode_synchronize_player_position(
   packet: SynchronizePlayerPositionPacket,
 ) {
   tree
-  |> encoder.double(packet.position.x)
-  |> encoder.double(packet.position.y)
-  |> encoder.double(packet.position.z)
+  |> encoder.var_int(packet.teleport_id)
+  |> common.encode_vector3(packet.position, encoder.double)
+  |> common.encode_vector3(packet.velocity, encoder.double)
   |> encoder.float(packet.rotation.yaw)
   |> encoder.float(packet.rotation.pitch)
-  |> encoder.byte(packet.flags)
-  |> encoder.var_int(packet.teleport_id)
+  |> encoder.int(packet.flags)
 }
 
 pub type PlayerInfoRemovePacket {
