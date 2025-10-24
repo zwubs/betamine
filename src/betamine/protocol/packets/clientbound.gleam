@@ -78,7 +78,7 @@ fn get_packet_id(packet: Packet) -> Int {
     UpdateEntityRotation(..) -> 54
     SetHeadRotation(..) -> 81
     RemoveEntities(..) -> 75
-    PlayKeepAlive(..) -> 27
+    PlayKeepAlive(..) -> 43
     SetEntityMetadata(..) -> 97
     AnimateEntity(..) -> 2
     AcknowledgeBlockChange(..) -> 4
