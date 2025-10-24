@@ -19,6 +19,7 @@ import betamine/protocol/registry
 import betamine/world
 import gleam/erlang/process.{type Subject}
 import gleam/function
+import gleam/io
 import gleam/list
 import gleam/otp/actor
 import gleam/string
@@ -82,10 +83,7 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
     ServerBoundPacket(data) -> {
       case protocol.decode_serverbound(state.phase, data) {
         Ok(packet) -> handle_server_bound(packet, state)
-        Error(error) -> {
-          echo error
-          Ok(state)
-        }
+        Error(_) -> Ok(state)
       }
     }
     GameUpdate(update) -> handle_game_update(update, state)
@@ -106,15 +104,18 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
 fn handle_error(error: Error, state: State) {
   case error {
     UnknownServerBoundPacket(phase, packet) -> {
-      echo "Unhandled Packet w/ Phase: "
+      io.println_error(
+        "Unhandled Packet w/ Phase: "
         <> string.inspect(phase)
         <> " & Packet:"
-        <> string.inspect(packet)
+        <> string.inspect(packet),
+      )
       actor.continue(state)
     }
     UnknownProtocolState(phase) -> {
-      echo "Client Requested An Unknown Protocol State: "
-        <> string.inspect(phase)
+      io.println_error(
+        "Client Requested An Unknown Protocol State: " <> string.inspect(phase),
+      )
       actor.continue(state)
     }
   }
@@ -137,8 +138,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     _ -> state
   }
-
-  // echo "Receivied Packet: " <> string.inspect(packet)
 
   case packet {
     serverbound.Handshake(packet) -> {
@@ -310,8 +309,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
 
       Ok(state)
     }
-    serverbound.PlayerInput(packet) -> {
-      echo packet
+    serverbound.PlayerInput(_) -> {
       Ok(state)
     }
     serverbound.Interact(packet) -> {
@@ -324,7 +322,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         }
         _ -> Nil
       }
-      echo packet
       Ok(state)
     }
     serverbound.SwingArm(packet) -> {
@@ -338,11 +335,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
 }
 
 fn send(state: State, packets: List(clientbound.Packet)) {
-  echo "Sending Packets To: "
-    <> state.profile.name
-    <> " w/ State: "
-    <> string.inspect(state.phase)
-
   list.each(packets, fn(packet) {
     let encoded_packet = protocol.encode_clientbound(packet)
     let assert Ok(Nil) = glisten.send(state.connection, encoded_packet)
@@ -350,7 +342,6 @@ fn send(state: State, packets: List(clientbound.Packet)) {
 }
 
 fn handle_game_update(update: update.Update, state: State) {
-  echo "Update: " <> string.inspect(update)
   case update {
     update.PlayerSpawned(player, entity) -> {
       send(state, player_handler.handle_spawn(player, entity))

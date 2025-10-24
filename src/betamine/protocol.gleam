@@ -11,10 +11,6 @@ pub fn decode_serverbound(phase: phase.Phase, data: BitArray) {
   let assert Ok(#(_length, data)) = decoder.var_int(data)
   // TODO: Add check for accurate length
   let assert Ok(#(id, data)) = decoder.var_int(data)
-  echo "Receiving Packet w/ Phase:"
-    <> string.inspect(phase)
-    <> ", Id: 0x"
-    <> int.to_base16(id)
   serverbound.decode(phase, id, data)
 }
 
