@@ -40,12 +40,6 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
     command.GetAllPlayers(subject) -> {
       dict.values(game.sessions)
       |> list.map(pair.second)
-      |> list.map(fn(player) {
-        case dict.get(game.entities, player.entity.id) {
-          Ok(entity) -> #(player, entity)
-          Error(_) -> #(player, entity.new(entity_kind.Player))
-        }
-      })
       |> process.send(subject, _)
       actor.continue(game)
     }
@@ -59,8 +53,8 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
           position: constants.mc_player_spawn_point,
         )
       let player = player.Player(name, entity, profile)
-      process.send(player_subject, #(player, entity))
-      update_sessions(game, update.PlayerSpawned(player, entity))
+      process.send(player_subject, player)
+      update_sessions(game, update.PlayerSpawned(player))
       actor.continue(Game(
         sessions: dict.insert(game.sessions, player.entity.uuid, #(
           subject,

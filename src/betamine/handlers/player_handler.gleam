@@ -27,8 +27,8 @@ pub fn handle_add(player: Player) -> Packet {
   )
 }
 
-pub fn handle_spawn(player: Player, entity: Entity) -> List(Packet) {
-  [handle_add(player), entity_handler.handle_spawn(entity)]
+pub fn handle_spawn(player: Player) -> List(Packet) {
+  [handle_add(player), entity_handler.handle_spawn(player.entity)]
 }
 
 pub fn handle_metadata_update(player: Player) -> Packet {

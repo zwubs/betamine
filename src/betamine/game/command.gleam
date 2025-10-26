@@ -10,14 +10,14 @@ pub type Command {
   Tick
   SpawnPlayer(
     subject: Subject(update.Update),
-    player_subject: Subject(#(Player, Entity)),
+    player_subject: Subject(Player),
     uuid: uuid.Uuid,
     name: String,
   )
   RemovePlayer(uuid: uuid.Uuid, subject: Subject(update.Update))
   MovePlayer(uuid: uuid.Uuid, position: Vector3(Float), on_ground: Bool)
   RotatePlayer(uuid: uuid.Uuid, rotation: Rotation, on_ground: Bool)
-  GetAllPlayers(subject: Subject(List(#(Player, Entity))))
+  GetAllPlayers(subject: Subject(List(Player)))
   UpdatePlayerSneaking(uuid: uuid.Uuid, sneaking: Bool)
   SwingPlayerArm(uuid: uuid.Uuid, is_dominant: Bool)
   Shutdown

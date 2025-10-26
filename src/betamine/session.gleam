@@ -227,7 +227,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     // Acknowledge Finish Configuration
     serverbound.AcknowledgeFinishConfiguration -> {
-      let #(player, entity) =
+      let player =
         process.call(state.game_subject, 1000, command.SpawnPlayer(
           state.subject_for_game,
           _,
@@ -252,8 +252,8 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
         clientbound.SynchronizePlayerPosition(
           clientbound.SynchronizePlayerPositionPacket(
-            entity.position,
-            entity.rotation,
+            player.entity.position,
+            player.entity.rotation,
             0,
             0,
           ),
@@ -263,9 +263,9 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
 
       process.call(state.game_subject, 1000, command.GetAllPlayers)
       |> list.filter(fn(other_player) {
-        { other_player.0 }.entity.uuid != player.entity.uuid
+        other_player.entity.uuid != player.entity.uuid
       })
-      |> list.map(fn(player) { player_handler.handle_spawn(player.0, player.1) })
+      |> list.map(fn(player) { player_handler.handle_spawn(player) })
       |> list.flatten
       |> send(state, _)
       Ok(State(..state, phase: phase.Play))
@@ -356,8 +356,8 @@ fn send(state: State, packets: List(clientbound.Packet)) {
 fn handle_game_update(update: update.Update, state: State) {
   echo "Update: " <> string.inspect(update)
   case update {
-    update.PlayerSpawned(player, entity) -> {
-      send(state, player_handler.handle_spawn(player, entity))
+    update.PlayerSpawned(player) -> {
+      send(state, player_handler.handle_spawn(player))
       Ok(state)
     }
     update.PlayerMetadataUpdated(player) -> {

@@ -5,7 +5,7 @@ import betamine/common/rotation.{type Rotation}
 import betamine/common/vector3.{type Vector3}
 
 pub type Update {
-  PlayerSpawned(player: Player, entity: Entity)
+  PlayerSpawned(player: Player)
   PlayerDisconnected(player: Player)
   PlayerMetadataUpdated(player: Player)
   EntityPosition(entity_id: Int, delta: Vector3(Float), on_ground: Bool)
