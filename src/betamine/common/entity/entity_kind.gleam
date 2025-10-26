@@ -1,80 +1,100 @@
 import betamine/protocol/error
 
 pub type EntityKind {
+  AcaciaBoat
+  AcaciaBoatWithChest
   Allay
   AreaEffectCloud
   Armadillo
   ArmorStand
   Arrow
   Axolotl
+  BambooRaftWithChest
+  BambooRaft
   Bat
   Bee
+  BirchBoat
+  BirchBoatWithChest
   Blaze
   BlockDisplay
-  Boat
   Bogged
   Breeze
   BreezeWindCharge
   Camel
   Cat
   CaveSpider
-  ChestBoat
-  MinecartChest
+  CherryBoat
+  CherryBoatWithChest
+  MinecartWithChest
   Chicken
   Cod
-  MinecartCommandBlock
+  CopperGolem
+  MinecartWithCommandBlock
   Cow
+  Creaking
   Creeper
+  DarkOakBoat
+  DarkOakBoatWithChest
   Dolphin
   Donkey
   DragonFireball
   Drowned
   ThrownEgg
   ElderGuardian
-  EndCrystal
-  EnderDragon
-  ThrownEnderpearl
-  EnderMan
+  Enderman
   Endermite
+  EnderDragon
+  ThrownEnderPearl
+  EndCrystal
   Evoker
   EvokerFangs
-  ThrownExperienceBottle
+  ThrownBottleOEnchanting
   ExperienceOrb
   EyeOfEnder
-  FallingBlockEntity
-  FireworkRocketEntity
+  FallingBlock
+  Fireball
+  FireworkRocket
   Fox
   Frog
-  MinecartFurnace
+  MinecartWithFurnace
   Ghast
+  HappyGhast
   Giant
   GlowItemFrame
   GlowSquid
   Goat
   Guardian
   Hoglin
-  MinecartHopper
+  MinecartWithHopper
   Horse
   Husk
   Illusioner
   Interaction
   IronGolem
-  ItemEntity
+  Item
   ItemDisplay
   ItemFrame
-  OminousItemSpawner
-  LargeFireball
-  LeashFenceKnotEntity
+  JungleBoat
+  JungleBoatWithChest
+  LeashKnot
   LightningBolt
   Llama
   LlamaSpit
   MagmaCube
+  MangroveBoat
+  MangroveBoatWithChest
+  Mannequin
   Marker
   Minecart
-  MushroomCow
+  Mooshroom
   Mule
+  OakBoat
+  OakBoatWithChest
   Ocelot
+  OminousItemSpawner
   Painting
+  PaleOakBoat
+  PaleOakBoatWithChest
   Panda
   Parrot
   Phantom
@@ -83,7 +103,8 @@ pub type EntityKind {
   PiglinBrute
   Pillager
   PolarBear
-  ThrownPotion
+  SplashPotion
+  LingeringPotion
   Pufferfish
   Rabbit
   Ravager
@@ -97,20 +118,22 @@ pub type EntityKind {
   Slime
   SmallFireball
   Sniffer
-  SnowGolem
   Snowball
-  MinecartSpawner
+  SnowGolem
+  MinecartWithMonsterSpawner
   SpectralArrow
   Spider
+  SpruceBoat
+  SpruceBoatWithChest
   Squid
   Stray
   Strider
   Tadpole
   TextDisplay
-  PrimedTnt
-  MinecartTNT
+  PrimedTNT
+  MinecartWithTNT
   TraderLlama
-  ThrownTrident
+  Trident
   TropicalFish
   Turtle
   Vex
@@ -120,7 +143,7 @@ pub type EntityKind {
   Warden
   WindCharge
   Witch
-  WitherBoss
+  Wither
   WitherSkeleton
   WitherSkull
   Wolf
@@ -130,276 +153,322 @@ pub type EntityKind {
   ZombieVillager
   ZombifiedPiglin
   Player
-  FishingHook
+  FishingBobber
 }
 
 pub fn to_id(kind: EntityKind) {
   case kind {
-    Allay -> 0
-    AreaEffectCloud -> 1
-    Armadillo -> 2
-    ArmorStand -> 3
-    Arrow -> 4
-    Axolotl -> 5
-    Bat -> 6
-    Bee -> 7
-    Blaze -> 8
-    BlockDisplay -> 9
-    Boat -> 10
-    Bogged -> 11
-    Breeze -> 12
-    BreezeWindCharge -> 13
-    Camel -> 14
-    Cat -> 15
-    CaveSpider -> 16
-    ChestBoat -> 17
-    MinecartChest -> 18
-    Chicken -> 19
-    Cod -> 20
-    MinecartCommandBlock -> 21
-    Cow -> 22
-    Creeper -> 23
-    Dolphin -> 24
-    Donkey -> 25
-    DragonFireball -> 26
-    Drowned -> 27
-    ThrownEgg -> 28
-    ElderGuardian -> 29
-    EndCrystal -> 30
-    EnderDragon -> 31
-    ThrownEnderpearl -> 32
-    EnderMan -> 33
-    Endermite -> 34
-    Evoker -> 35
-    EvokerFangs -> 36
-    ThrownExperienceBottle -> 37
-    ExperienceOrb -> 38
-    EyeOfEnder -> 39
-    FallingBlockEntity -> 40
-    FireworkRocketEntity -> 41
-    Fox -> 42
-    Frog -> 43
-    MinecartFurnace -> 44
-    Ghast -> 45
-    Giant -> 46
-    GlowItemFrame -> 47
-    GlowSquid -> 48
-    Goat -> 49
-    Guardian -> 50
-    Hoglin -> 51
-    MinecartHopper -> 52
-    Horse -> 53
-    Husk -> 54
-    Illusioner -> 55
-    Interaction -> 56
-    IronGolem -> 57
-    ItemEntity -> 58
-    ItemDisplay -> 59
-    ItemFrame -> 60
-    OminousItemSpawner -> 61
-    LargeFireball -> 62
-    LeashFenceKnotEntity -> 63
-    LightningBolt -> 64
-    Llama -> 65
-    LlamaSpit -> 66
-    MagmaCube -> 67
-    Marker -> 68
-    Minecart -> 69
-    MushroomCow -> 70
-    Mule -> 71
-    Ocelot -> 72
-    Painting -> 73
-    Panda -> 74
-    Parrot -> 75
-    Phantom -> 76
-    Pig -> 77
-    Piglin -> 78
-    PiglinBrute -> 79
-    Pillager -> 80
-    PolarBear -> 81
-    ThrownPotion -> 82
-    Pufferfish -> 83
-    Rabbit -> 84
-    Ravager -> 85
-    Salmon -> 86
-    Sheep -> 87
-    Shulker -> 88
-    ShulkerBullet -> 89
-    Silverfish -> 90
-    Skeleton -> 91
-    SkeletonHorse -> 92
-    Slime -> 93
-    SmallFireball -> 94
-    Sniffer -> 95
-    SnowGolem -> 96
-    Snowball -> 97
-    MinecartSpawner -> 98
-    SpectralArrow -> 99
-    Spider -> 100
-    Squid -> 101
-    Stray -> 102
-    Strider -> 103
-    Tadpole -> 104
-    TextDisplay -> 105
-    PrimedTnt -> 106
-    MinecartTNT -> 107
-    TraderLlama -> 108
-    ThrownTrident -> 109
-    TropicalFish -> 110
-    Turtle -> 111
-    Vex -> 112
-    Villager -> 113
-    Vindicator -> 114
-    WanderingTrader -> 115
-    Warden -> 116
-    WindCharge -> 117
-    Witch -> 118
-    WitherBoss -> 119
-    WitherSkeleton -> 120
-    WitherSkull -> 121
-    Wolf -> 122
-    Zoglin -> 123
-    Zombie -> 124
-    ZombieHorse -> 125
-    ZombieVillager -> 126
-    ZombifiedPiglin -> 127
-    Player -> 128
-    FishingHook -> 129
+    AcaciaBoat -> 0
+    AcaciaBoatWithChest -> 1
+    Allay -> 2
+    AreaEffectCloud -> 3
+    Armadillo -> 4
+    ArmorStand -> 5
+    Arrow -> 6
+    Axolotl -> 7
+    BambooRaftWithChest -> 8
+    BambooRaft -> 9
+    Bat -> 10
+    Bee -> 11
+    BirchBoat -> 12
+    BirchBoatWithChest -> 13
+    Blaze -> 14
+    BlockDisplay -> 15
+    Bogged -> 16
+    Breeze -> 17
+    BreezeWindCharge -> 18
+    Camel -> 19
+    Cat -> 20
+    CaveSpider -> 21
+    CherryBoat -> 22
+    CherryBoatWithChest -> 23
+    MinecartWithChest -> 24
+    Chicken -> 25
+    Cod -> 26
+    CopperGolem -> 27
+    MinecartWithCommandBlock -> 28
+    Cow -> 29
+    Creaking -> 30
+    Creeper -> 31
+    DarkOakBoat -> 32
+    DarkOakBoatWithChest -> 33
+    Dolphin -> 34
+    Donkey -> 35
+    DragonFireball -> 36
+    Drowned -> 37
+    ThrownEgg -> 38
+    ElderGuardian -> 39
+    Enderman -> 40
+    Endermite -> 41
+    EnderDragon -> 42
+    ThrownEnderPearl -> 43
+    EndCrystal -> 44
+    Evoker -> 45
+    EvokerFangs -> 46
+    ThrownBottleOEnchanting -> 47
+    ExperienceOrb -> 48
+    EyeOfEnder -> 49
+    FallingBlock -> 50
+    Fireball -> 51
+    FireworkRocket -> 52
+    Fox -> 53
+    Frog -> 54
+    MinecartWithFurnace -> 55
+    Ghast -> 56
+    HappyGhast -> 57
+    Giant -> 58
+    GlowItemFrame -> 59
+    GlowSquid -> 60
+    Goat -> 61
+    Guardian -> 62
+    Hoglin -> 63
+    MinecartWithHopper -> 64
+    Horse -> 65
+    Husk -> 66
+    Illusioner -> 67
+    Interaction -> 68
+    IronGolem -> 69
+    Item -> 70
+    ItemDisplay -> 71
+    ItemFrame -> 72
+    JungleBoat -> 73
+    JungleBoatWithChest -> 74
+    LeashKnot -> 75
+    LightningBolt -> 76
+    Llama -> 77
+    LlamaSpit -> 78
+    MagmaCube -> 79
+    MangroveBoat -> 80
+    MangroveBoatWithChest -> 81
+    Mannequin -> 82
+    Marker -> 83
+    Minecart -> 84
+    Mooshroom -> 85
+    Mule -> 86
+    OakBoat -> 87
+    OakBoatWithChest -> 88
+    Ocelot -> 89
+    OminousItemSpawner -> 90
+    Painting -> 91
+    PaleOakBoat -> 92
+    PaleOakBoatWithChest -> 93
+    Panda -> 94
+    Parrot -> 95
+    Phantom -> 96
+    Pig -> 97
+    Piglin -> 98
+    PiglinBrute -> 99
+    Pillager -> 100
+    PolarBear -> 101
+    SplashPotion -> 102
+    LingeringPotion -> 103
+    Pufferfish -> 104
+    Rabbit -> 105
+    Ravager -> 106
+    Salmon -> 107
+    Sheep -> 108
+    Shulker -> 109
+    ShulkerBullet -> 110
+    Silverfish -> 111
+    Skeleton -> 112
+    SkeletonHorse -> 113
+    Slime -> 114
+    SmallFireball -> 115
+    Sniffer -> 116
+    Snowball -> 117
+    SnowGolem -> 118
+    MinecartWithMonsterSpawner -> 119
+    SpectralArrow -> 120
+    Spider -> 121
+    SpruceBoat -> 122
+    SpruceBoatWithChest -> 123
+    Squid -> 124
+    Stray -> 125
+    Strider -> 126
+    Tadpole -> 127
+    TextDisplay -> 128
+    PrimedTNT -> 129
+    MinecartWithTNT -> 130
+    TraderLlama -> 131
+    Trident -> 132
+    TropicalFish -> 133
+    Turtle -> 134
+    Vex -> 135
+    Villager -> 136
+    Vindicator -> 137
+    WanderingTrader -> 138
+    Warden -> 139
+    WindCharge -> 140
+    Witch -> 141
+    Wither -> 142
+    WitherSkeleton -> 143
+    WitherSkull -> 144
+    Wolf -> 145
+    Zoglin -> 146
+    Zombie -> 147
+    ZombieHorse -> 148
+    ZombieVillager -> 149
+    ZombifiedPiglin -> 150
+    Player -> 151
+    FishingBobber -> 152
   }
 }
 
 pub fn from_id(id: Int) {
   case id {
-    0 -> Ok(Allay)
-    1 -> Ok(AreaEffectCloud)
-    2 -> Ok(Armadillo)
-    3 -> Ok(ArmorStand)
-    4 -> Ok(Arrow)
-    5 -> Ok(Axolotl)
-    6 -> Ok(Bat)
-    7 -> Ok(Bee)
-    8 -> Ok(Blaze)
-    9 -> Ok(BlockDisplay)
-    10 -> Ok(Boat)
-    11 -> Ok(Bogged)
-    12 -> Ok(Breeze)
-    13 -> Ok(BreezeWindCharge)
-    14 -> Ok(Camel)
-    15 -> Ok(Cat)
-    16 -> Ok(CaveSpider)
-    17 -> Ok(ChestBoat)
-    18 -> Ok(MinecartChest)
-    19 -> Ok(Chicken)
-    20 -> Ok(Cod)
-    21 -> Ok(MinecartCommandBlock)
-    22 -> Ok(Cow)
-    23 -> Ok(Creeper)
-    24 -> Ok(Dolphin)
-    25 -> Ok(Donkey)
-    26 -> Ok(DragonFireball)
-    27 -> Ok(Drowned)
-    28 -> Ok(ThrownEgg)
-    29 -> Ok(ElderGuardian)
-    30 -> Ok(EndCrystal)
-    31 -> Ok(EnderDragon)
-    32 -> Ok(ThrownEnderpearl)
-    33 -> Ok(EnderMan)
-    34 -> Ok(Endermite)
-    35 -> Ok(Evoker)
-    36 -> Ok(EvokerFangs)
-    37 -> Ok(ThrownExperienceBottle)
-    38 -> Ok(ExperienceOrb)
-    39 -> Ok(EyeOfEnder)
-    40 -> Ok(FallingBlockEntity)
-    41 -> Ok(FireworkRocketEntity)
-    42 -> Ok(Fox)
-    43 -> Ok(Frog)
-    44 -> Ok(MinecartFurnace)
-    45 -> Ok(Ghast)
-    46 -> Ok(Giant)
-    47 -> Ok(GlowItemFrame)
-    48 -> Ok(GlowSquid)
-    49 -> Ok(Goat)
-    50 -> Ok(Guardian)
-    51 -> Ok(Hoglin)
-    52 -> Ok(MinecartHopper)
-    53 -> Ok(Horse)
-    54 -> Ok(Husk)
-    55 -> Ok(Illusioner)
-    56 -> Ok(Interaction)
-    57 -> Ok(IronGolem)
-    58 -> Ok(ItemEntity)
-    59 -> Ok(ItemDisplay)
-    60 -> Ok(ItemFrame)
-    61 -> Ok(OminousItemSpawner)
-    62 -> Ok(LargeFireball)
-    63 -> Ok(LeashFenceKnotEntity)
-    64 -> Ok(LightningBolt)
-    65 -> Ok(Llama)
-    66 -> Ok(LlamaSpit)
-    67 -> Ok(MagmaCube)
-    68 -> Ok(Marker)
-    69 -> Ok(Minecart)
-    70 -> Ok(MushroomCow)
-    71 -> Ok(Mule)
-    72 -> Ok(Ocelot)
-    73 -> Ok(Painting)
-    74 -> Ok(Panda)
-    75 -> Ok(Parrot)
-    76 -> Ok(Phantom)
-    77 -> Ok(Pig)
-    78 -> Ok(Piglin)
-    79 -> Ok(PiglinBrute)
-    80 -> Ok(Pillager)
-    81 -> Ok(PolarBear)
-    82 -> Ok(ThrownPotion)
-    83 -> Ok(Pufferfish)
-    84 -> Ok(Rabbit)
-    85 -> Ok(Ravager)
-    86 -> Ok(Salmon)
-    87 -> Ok(Sheep)
-    88 -> Ok(Shulker)
-    89 -> Ok(ShulkerBullet)
-    90 -> Ok(Silverfish)
-    91 -> Ok(Skeleton)
-    92 -> Ok(SkeletonHorse)
-    93 -> Ok(Slime)
-    94 -> Ok(SmallFireball)
-    95 -> Ok(Sniffer)
-    96 -> Ok(SnowGolem)
-    97 -> Ok(Snowball)
-    98 -> Ok(MinecartSpawner)
-    99 -> Ok(SpectralArrow)
-    100 -> Ok(Spider)
-    101 -> Ok(Squid)
-    102 -> Ok(Stray)
-    103 -> Ok(Strider)
-    104 -> Ok(Tadpole)
-    105 -> Ok(TextDisplay)
-    106 -> Ok(PrimedTnt)
-    107 -> Ok(MinecartTNT)
-    108 -> Ok(TraderLlama)
-    109 -> Ok(ThrownTrident)
-    110 -> Ok(TropicalFish)
-    111 -> Ok(Turtle)
-    112 -> Ok(Vex)
-    113 -> Ok(Villager)
-    114 -> Ok(Vindicator)
-    115 -> Ok(WanderingTrader)
-    116 -> Ok(Warden)
-    117 -> Ok(WindCharge)
-    118 -> Ok(Witch)
-    119 -> Ok(WitherBoss)
-    120 -> Ok(WitherSkeleton)
-    121 -> Ok(WitherSkull)
-    122 -> Ok(Wolf)
-    123 -> Ok(Zoglin)
-    124 -> Ok(Zombie)
-    125 -> Ok(ZombieHorse)
-    126 -> Ok(ZombieVillager)
-    127 -> Ok(ZombifiedPiglin)
-    128 -> Ok(Player)
-    129 -> Ok(FishingHook)
-    id -> Error(error.InvalidEnumValue("EntityKind", 0, 129, id))
+    0 -> Ok(AcaciaBoat)
+    1 -> Ok(AcaciaBoatWithChest)
+    2 -> Ok(Allay)
+    3 -> Ok(AreaEffectCloud)
+    4 -> Ok(Armadillo)
+    5 -> Ok(ArmorStand)
+    6 -> Ok(Arrow)
+    7 -> Ok(Axolotl)
+    8 -> Ok(BambooRaftWithChest)
+    9 -> Ok(BambooRaft)
+    10 -> Ok(Bat)
+    11 -> Ok(Bee)
+    12 -> Ok(BirchBoat)
+    13 -> Ok(BirchBoatWithChest)
+    14 -> Ok(Blaze)
+    15 -> Ok(BlockDisplay)
+    16 -> Ok(Bogged)
+    17 -> Ok(Breeze)
+    18 -> Ok(WindCharge)
+    19 -> Ok(Camel)
+    20 -> Ok(Cat)
+    21 -> Ok(CaveSpider)
+    22 -> Ok(CherryBoat)
+    23 -> Ok(CherryBoatWithChest)
+    24 -> Ok(MinecartWithChest)
+    25 -> Ok(Chicken)
+    26 -> Ok(Cod)
+    27 -> Ok(CopperGolem)
+    28 -> Ok(MinecartWithCommandBlock)
+    29 -> Ok(Cow)
+    30 -> Ok(Creaking)
+    31 -> Ok(Creeper)
+    32 -> Ok(DarkOakBoat)
+    33 -> Ok(DarkOakBoatWithChest)
+    34 -> Ok(Dolphin)
+    35 -> Ok(Donkey)
+    36 -> Ok(DragonFireball)
+    37 -> Ok(Drowned)
+    38 -> Ok(ThrownEgg)
+    39 -> Ok(ElderGuardian)
+    40 -> Ok(Enderman)
+    41 -> Ok(Endermite)
+    42 -> Ok(EnderDragon)
+    43 -> Ok(ThrownEnderPearl)
+    44 -> Ok(EndCrystal)
+    45 -> Ok(Evoker)
+    46 -> Ok(EvokerFangs)
+    47 -> Ok(ThrownBottleOEnchanting)
+    48 -> Ok(ExperienceOrb)
+    49 -> Ok(EyeOfEnder)
+    50 -> Ok(FallingBlock)
+    51 -> Ok(Fireball)
+    52 -> Ok(FireworkRocket)
+    53 -> Ok(Fox)
+    54 -> Ok(Frog)
+    55 -> Ok(MinecartWithFurnace)
+    56 -> Ok(Ghast)
+    57 -> Ok(HappyGhast)
+    58 -> Ok(Giant)
+    59 -> Ok(GlowItemFrame)
+    60 -> Ok(GlowSquid)
+    61 -> Ok(Goat)
+    62 -> Ok(Guardian)
+    63 -> Ok(Hoglin)
+    64 -> Ok(MinecartWithHopper)
+    65 -> Ok(Horse)
+    66 -> Ok(Husk)
+    67 -> Ok(Illusioner)
+    68 -> Ok(Interaction)
+    69 -> Ok(IronGolem)
+    70 -> Ok(Item)
+    71 -> Ok(ItemDisplay)
+    72 -> Ok(ItemFrame)
+    73 -> Ok(JungleBoat)
+    74 -> Ok(JungleBoatWithChest)
+    75 -> Ok(LeashKnot)
+    76 -> Ok(LightningBolt)
+    77 -> Ok(Llama)
+    78 -> Ok(LlamaSpit)
+    79 -> Ok(MagmaCube)
+    80 -> Ok(MangroveBoat)
+    81 -> Ok(MangroveBoatWithChest)
+    82 -> Ok(Mannequin)
+    83 -> Ok(Marker)
+    84 -> Ok(Minecart)
+    85 -> Ok(Mooshroom)
+    86 -> Ok(Mule)
+    87 -> Ok(OakBoat)
+    88 -> Ok(OakBoatWithChest)
+    89 -> Ok(Ocelot)
+    90 -> Ok(OminousItemSpawner)
+    91 -> Ok(Painting)
+    92 -> Ok(PaleOakBoat)
+    93 -> Ok(PaleOakBoatWithChest)
+    94 -> Ok(Panda)
+    95 -> Ok(Parrot)
+    96 -> Ok(Phantom)
+    97 -> Ok(Pig)
+    98 -> Ok(Piglin)
+    99 -> Ok(PiglinBrute)
+    100 -> Ok(Pillager)
+    101 -> Ok(PolarBear)
+    102 -> Ok(SplashPotion)
+    103 -> Ok(LingeringPotion)
+    104 -> Ok(Pufferfish)
+    105 -> Ok(Rabbit)
+    106 -> Ok(Ravager)
+    107 -> Ok(Salmon)
+    108 -> Ok(Sheep)
+    109 -> Ok(Shulker)
+    110 -> Ok(ShulkerBullet)
+    111 -> Ok(Silverfish)
+    112 -> Ok(Skeleton)
+    113 -> Ok(SkeletonHorse)
+    114 -> Ok(Slime)
+    115 -> Ok(SmallFireball)
+    116 -> Ok(Sniffer)
+    117 -> Ok(Snowball)
+    118 -> Ok(SnowGolem)
+    119 -> Ok(MinecartWithMonsterSpawner)
+    120 -> Ok(SpectralArrow)
+    121 -> Ok(Spider)
+    122 -> Ok(SpruceBoat)
+    123 -> Ok(SpruceBoatWithChest)
+    124 -> Ok(Squid)
+    125 -> Ok(Stray)
+    126 -> Ok(Strider)
+    127 -> Ok(Tadpole)
+    128 -> Ok(TextDisplay)
+    129 -> Ok(PrimedTNT)
+    130 -> Ok(MinecartWithTNT)
+    131 -> Ok(TraderLlama)
+    132 -> Ok(Trident)
+    133 -> Ok(TropicalFish)
+    134 -> Ok(Turtle)
+    135 -> Ok(Vex)
+    136 -> Ok(Villager)
+    137 -> Ok(Vindicator)
+    138 -> Ok(WanderingTrader)
+    139 -> Ok(Warden)
+    140 -> Ok(WindCharge)
+    141 -> Ok(Witch)
+    142 -> Ok(Wither)
+    143 -> Ok(WitherSkeleton)
+    144 -> Ok(WitherSkull)
+    145 -> Ok(Wolf)
+    146 -> Ok(Zoglin)
+    147 -> Ok(Zombie)
+    148 -> Ok(ZombieHorse)
+    149 -> Ok(ZombieVillager)
+    150 -> Ok(ZombifiedPiglin)
+    151 -> Ok(Player)
+    152 -> Ok(FishingBobber)
+    value -> Error(error.InvalidEnumValue("EntityKind", 0, 152, value))
   }
 }

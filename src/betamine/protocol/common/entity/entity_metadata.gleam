@@ -11,7 +11,6 @@ import gleam/bytes_tree
 import gleam/dict
 import gleam/list
 import gleam/option
-import nbeet
 
 pub type Metadata =
   dict.Dict(Int, DataType)
@@ -33,21 +32,27 @@ pub type DataType {
   OptionalLivingEntityReference(option.Option(uuid.Uuid))
   BlockState
   OptionalBlockState(option.Option(Nil))
-  NBT(nbeet.Nbt)
   Particle(particle.Particle)
   Particles(List(particle.Particle))
   VillagerData(villager_type: Int, villager_profession: Int, level: Int)
   OptionalVarInt(option.Option(Int))
   Pose(entity_pose.EntityPose)
   CatVariant(Int)
+  CowVariant(Int)
   WolfVariant(Int)
+  WolfSoundVariant(Int)
   FrogVariant(Int)
+  PigVariant(Int)
+  ChickenVariant(Int)
   OptionalGlobalPosition(option.Option(global_position.GlobalPosition))
   PaintingVariant
   SnifferState
   AramdilloState
+  CopperGolemState
+  CopperOxidizationGolemLevel
   Vector3(Float, Float, Float)
   Quaternion(Float, Float, Float, Float)
+  ResolvableProfile
 }
 
 pub fn to_type_int(data_type: DataType) {
@@ -68,21 +73,27 @@ pub fn to_type_int(data_type: DataType) {
     OptionalLivingEntityReference(..) -> 13
     BlockState -> 14
     OptionalBlockState(..) -> 15
-    NBT(..) -> 16
-    Particle(..) -> 17
-    Particles(..) -> 18
-    VillagerData(..) -> 19
-    OptionalVarInt(..) -> 20
-    Pose(..) -> 21
-    CatVariant(..) -> 22
+    Particle(..) -> 16
+    Particles(..) -> 17
+    VillagerData(..) -> 18
+    OptionalVarInt(..) -> 19
+    Pose(..) -> 20
+    CatVariant(..) -> 21
+    CowVariant(..) -> 22
     WolfVariant(..) -> 23
-    FrogVariant(..) -> 24
-    OptionalGlobalPosition(..) -> 25
-    PaintingVariant -> 26
-    SnifferState -> 27
-    AramdilloState -> 28
-    Vector3(..) -> 29
-    Quaternion(..) -> 30
+    WolfSoundVariant(..) -> 24
+    FrogVariant(..) -> 25
+    PigVariant(..) -> 26
+    ChickenVariant(..) -> 27
+    OptionalGlobalPosition(..) -> 28
+    PaintingVariant -> 29
+    SnifferState -> 30
+    AramdilloState -> 31
+    CopperGolemState -> 32
+    CopperOxidizationGolemLevel -> 33
+    Vector3(..) -> 34
+    Quaternion(..) -> 35
+    ResolvableProfile(..) -> 36
   }
 }
 
@@ -104,9 +115,6 @@ fn encode_data_type(bytes_tree: bytes_tree.BytesTree, data_type: DataType) {
     VarLong(var_long) -> encoder.var_long(_, var_long)
     Float(float) -> encoder.float(_, float)
     String(string) -> encoder.string(_, string)
-    TextComponent(_) -> todo
-    OptionalTextComponent(_) -> todo
-    Slot(_) -> todo
     Boolean(bool) -> encoder.bool(_, bool)
     Rotations(x, y, z) -> list.fold([x, y, z], _, encoder.float)
     Position(position) -> encoder.raw(_, position.to_bit_array(position))
@@ -116,21 +124,11 @@ fn encode_data_type(bytes_tree: bytes_tree.BytesTree, data_type: DataType) {
       encoder.position,
     )
     Direction(direction) -> encoder.var_int(_, direction.to_int(direction))
-    OptionalLivingEntityReference(_) -> todo
-    BlockState -> todo
-    OptionalBlockState(_) -> todo
-    NBT(_) -> todo
-    Particle(_) -> todo
-    Particles(_) -> todo
-    VillagerData(_, _, _) -> todo
     OptionalVarInt(optional_var_int) -> encoder.var_int(
       _,
       option.unwrap(optional_var_int, 0),
     )
     Pose(pose) -> encoder.var_int(_, entity_pose.to_int(pose))
-    CatVariant(_) -> todo
-    WolfVariant(_) -> todo
-    FrogVariant(_) -> todo
     OptionalGlobalPosition(optional_global_position) -> encoder.optional(
       _,
       optional_global_position,
@@ -140,10 +138,8 @@ fn encode_data_type(bytes_tree: bytes_tree.BytesTree, data_type: DataType) {
         |> encoder.position(global_position.position)
       },
     )
-    PaintingVariant -> todo
-    SnifferState -> todo
-    AramdilloState -> todo
     Vector3(x, y, z) -> list.fold([x, y, z], _, encoder.float)
     Quaternion(x, y, z, w) -> list.fold([x, y, z, w], _, encoder.float)
+    _ -> todo as "Unhandled metadata type"
   }
 }
