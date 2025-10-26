@@ -41,6 +41,7 @@ type State {
     last_keep_alive: Int,
     profile: profile.Profile,
     uuid: uuid.Uuid,
+    ignore_position_packets: Bool,
   )
 }
 
@@ -69,6 +70,7 @@ pub fn start(
         last_keep_alive: now_seconds(),
         profile: profile.default(),
         uuid: uuid.default,
+        ignore_position_packets: True,
       ))
       |> actor.selecting(selector)
       |> actor.returning(subject_for_host),
@@ -91,10 +93,7 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
     }
     GameUpdate(update) -> handle_game_update(update, state)
     Disconnect -> {
-      process.send(
-        state.game_subject,
-        command.RemovePlayer(state.uuid, state.subject_for_game),
-      )
+      process.send(state.game_subject, command.RemovePlayer(state.uuid))
       Ok(state)
     }
   }
@@ -106,11 +105,7 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
 
 fn handle_error(error: Error, state: State) {
   case error {
-    UnknownServerBoundPacket(phase, packet) -> {
-      echo "Unhandled Packet w/ Phase: "
-        <> string.inspect(phase)
-        <> " & Packet:"
-        <> string.inspect(packet)
+    UnknownServerBoundPacket(_, _) -> {
       actor.continue(state)
     }
     UnknownProtocolState(phase) -> {
@@ -138,8 +133,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     _ -> state
   }
-
-  // echo "Receivied Packet: " <> string.inspect(packet)
 
   case packet {
     serverbound.Handshake(packet) -> {
@@ -233,7 +226,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           state.subject_for_game,
           _,
           state.uuid,
-          state.profile.name,
         ))
       send(state, [
         clientbound.Login(
@@ -242,7 +234,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             entity_id: player.entity.id,
           ),
         ),
-        player_handler.handle_add(player),
+        player_handler.handle_add(player.profile),
         clientbound.ChangeDifficulty(clientbound.ChangeDifficultyPacket(
           difficulty: difficulty.Easy,
           locked: False,
@@ -270,27 +262,39 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
 
       process.call(state.game_subject, 1000, command.GetAllPlayers)
       |> list.filter(fn(other_player) {
-        other_player.entity.uuid != player.entity.uuid
+        other_player.profile.id != player.profile.id
       })
-      |> list.map(fn(player) { player_handler.handle_spawn(player) })
+      |> list.map(player_handler.handle_spawn)
       |> list.flatten
       |> send(state, _)
-      Ok(State(..state, phase: phase.Play))
+      Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
     }
-    serverbound.ConfirmTeleport(_) -> Ok(state)
+    serverbound.ConfirmTeleport(_) -> {
+      Ok(State(..state, ignore_position_packets: False))
+    }
     serverbound.KeepAlive(_) -> Ok(state)
     serverbound.PlayerPosition(packet) -> {
-      process.send(
-        state.game_subject,
-        command.MovePlayer(state.uuid, packet.position, packet.on_ground),
-      )
+      case state.ignore_position_packets {
+        True -> Nil
+        False -> {
+          process.send(
+            state.game_subject,
+            command.MovePlayer(state.uuid, packet.position, packet.on_ground),
+          )
+        }
+      }
       Ok(state)
     }
     serverbound.PlayerPositionAndRotation(packet) -> {
-      process.send(
-        state.game_subject,
-        command.MovePlayer(state.uuid, packet.position, packet.on_ground),
-      )
+      case state.ignore_position_packets {
+        True -> Nil
+        False -> {
+          process.send(
+            state.game_subject,
+            command.MovePlayer(state.uuid, packet.position, packet.on_ground),
+          )
+        }
+      }
       process.send(
         state.game_subject,
         command.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
@@ -321,8 +325,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
 
       Ok(state)
     }
-    serverbound.PlayerInput(packet) -> {
-      echo packet
+    serverbound.PlayerInput(_) -> {
       Ok(state)
     }
     serverbound.Interact(packet) -> {
@@ -335,7 +338,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         }
         _ -> Nil
       }
-      echo packet
       Ok(state)
     }
     serverbound.SwingArm(packet) -> {
@@ -349,11 +351,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
 }
 
 fn send(state: State, packets: List(clientbound.Packet)) {
-  echo "Sending Packets To: "
-    <> state.profile.name
-    <> " w/ State: "
-    <> string.inspect(state.phase)
-
   list.each(packets, fn(packet) {
     let encoded_packet = protocol.encode_clientbound(packet)
     let assert Ok(Nil) = glisten.send(state.connection, encoded_packet)
@@ -361,14 +358,13 @@ fn send(state: State, packets: List(clientbound.Packet)) {
 }
 
 fn handle_game_update(update: update.Update, state: State) {
-  echo "Update: " <> string.inspect(update)
   case update {
     update.PlayerSpawned(player) -> {
       send(state, player_handler.handle_spawn(player))
       Ok(state)
     }
-    update.PlayerMetadataUpdated(player) -> {
-      send(state, [player_handler.handle_metadata_update(player)])
+    update.PlayerMetadataUpdated(entity_id, metadata) -> {
+      send(state, [entity_handler.handle_metadata_update(entity_id, metadata)])
       Ok(state)
     }
     update.EntityPosition(id, delta, on_ground) -> {
@@ -379,8 +375,8 @@ fn handle_game_update(update: update.Update, state: State) {
       send(state, entity_handler.handle_rotate(id, rotation, on_ground))
       Ok(state)
     }
-    update.PlayerDisconnected(player) -> {
-      send(state, player_handler.handle_disconnect(player))
+    update.PlayerDisconnected(uuid, entity_id) -> {
+      send(state, player_handler.handle_disconnect(uuid, entity_id))
       Ok(state)
     }
     update.EntityAnimation(id, animation) -> {

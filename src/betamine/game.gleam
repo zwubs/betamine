@@ -2,8 +2,9 @@ import betamine/common/entity.{type Entity}
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
 import betamine/common/entity/entity_metadata
-import betamine/common/entity/player.{type Player}
+import betamine/common/entity/player
 import betamine/common/math/vector3
+import betamine/common/profile
 import betamine/common/uuid
 import betamine/constants
 import betamine/game/command.{type Command}
@@ -18,14 +19,19 @@ import gleam/result
 
 type Game {
   Game(
-    sessions: dict.Dict(uuid.Uuid, #(Subject(Update), Player)),
+    sessions: dict.Dict(uuid.Uuid, #(Subject(Update), Int)),
+    profiles: dict.Dict(uuid.Uuid, profile.Profile),
     entities: dict.Dict(Int, Entity),
   )
 }
 
 pub fn start() -> Result(Subject(Command), actor.StartError) {
   let start_result =
-    actor.new(Game(sessions: dict.new(), entities: dict.new()))
+    actor.new(Game(
+      sessions: dict.new(),
+      profiles: dict.new(),
+      entities: dict.new(),
+    ))
     |> actor.on_message(loop)
     |> actor.start()
 
@@ -38,12 +44,17 @@ pub fn start() -> Result(Subject(Command), actor.StartError) {
 fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
   case command {
     command.GetAllPlayers(subject) -> {
-      dict.values(game.sessions)
-      |> list.map(pair.second)
+      list.filter_map(dict.to_list(game.profiles), fn(tuple) {
+        let #(uuid, profile) = tuple
+        case get_player_entity(game, uuid) {
+          Ok(entity) -> Ok(player.Player(profile:, entity:))
+          Error(_) -> Error(Nil)
+        }
+      })
       |> process.send(subject, _)
       actor.continue(game)
     }
-    command.SpawnPlayer(subject, player_subject, uuid, name) -> {
+    command.SpawnPlayer(subject, player_subject, uuid) -> {
       let assert Ok(profile) = mojang.fetch_profile(uuid)
       let entity =
         entity.Entity(
@@ -52,118 +63,132 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
           uuid:,
           position: constants.mc_player_spawn_point,
         )
-      let player = player.Player(name, entity, profile)
+      let player = player.Player(profile:, entity:)
       process.send(player_subject, player)
       update_sessions(game, update.PlayerSpawned(player))
       actor.continue(Game(
-        sessions: dict.insert(game.sessions, player.entity.uuid, #(
-          subject,
-          player,
-        )),
+        sessions: dict.insert(game.sessions, uuid, #(subject, entity.id)),
+        profiles: dict.insert(game.profiles, uuid, profile),
         entities: dict.insert(game.entities, entity.id, entity),
       ))
     }
     command.MovePlayer(uuid, new_position, on_ground) -> {
-      let entity = case dict.get(game.sessions, uuid) {
-        Ok(#(_subject, player)) -> {
-          case vector3.equal(player.entity.position, new_position) {
-            True -> player.entity
+      case get_player_entity(game, uuid) {
+        Ok(entity) -> {
+          case vector3.equal(entity.position, new_position) {
+            True -> game
             False -> {
               update_sessions(
                 game,
                 update.EntityPosition(
-                  player.entity.id,
-                  vector3.subtract(new_position, player.entity.position),
+                  entity.id,
+                  vector3.subtract(new_position, entity.position),
                   on_ground,
                 ),
               )
-              entity.Entity(..player.entity, position: new_position)
+              Game(
+                ..game,
+                entities: dict.insert(
+                  game.entities,
+                  entity.id,
+                  entity.Entity(..entity, position: new_position),
+                ),
+              )
             }
           }
         }
-        Error(_) -> todo
+        Error(_) -> game
       }
-      actor.continue(
-        Game(..game, entities: dict.insert(game.entities, entity.id, entity)),
-      )
+      |> actor.continue()
     }
     command.RotatePlayer(uuid, rotation, on_ground) -> {
-      let entity = case dict.get(game.sessions, uuid) {
-        Ok(#(_subject, player)) -> {
+      case get_player_entity(game, uuid) {
+        Ok(entity) -> {
           update_sessions(
             game,
-            update.EntityRotation(player.entity.id, rotation, on_ground),
+            update.EntityRotation(entity.id, rotation, on_ground),
           )
-          entity.Entity(..player.entity, rotation:)
+          Game(
+            ..game,
+            entities: dict.insert(
+              game.entities,
+              entity.id,
+              entity.Entity(..entity, rotation:),
+            ),
+          )
         }
-        Error(_) -> todo
-      }
-      actor.continue(
-        Game(..game, entities: dict.insert(game.entities, entity.id, entity)),
-      )
-    }
-    command.RemovePlayer(uuid, _subject) -> {
-      case dict.get(game.sessions, uuid) {
         Error(_) -> game
-        Ok(#(_subject, player)) -> {
-          update_sessions(game, update.PlayerDisconnected(player))
+      }
+      |> actor.continue()
+    }
+    command.RemovePlayer(uuid) -> {
+      case get_player_entity_id(game, uuid) {
+        Ok(entity_id) -> {
+          update_sessions(game, update.PlayerDisconnected(uuid, entity_id))
           Game(
             sessions: dict.delete(game.sessions, uuid),
-            entities: dict.delete(game.entities, player.entity.id),
+            profiles: dict.delete(game.profiles, uuid),
+            entities: dict.delete(game.entities, entity_id),
           )
         }
+        Error(_) -> game
       }
       |> actor.continue()
     }
     command.UpdatePlayerSneaking(uuid, sneaking) -> {
-      let session = dict.get(game.sessions, uuid)
-      let game = case session {
-        Error(_) -> game
-        Ok(#(subject, player)) -> {
-          let metadata =
-            entity_metadata.set(
-              player.entity.metadata,
-              entity_metadata.sneaking,
-              sneaking,
+      case get_player_entity(game, uuid) {
+        Ok(entity) -> {
+          let entity =
+            entity.Entity(
+              ..entity,
+              metadata: entity_metadata.set(
+                  entity.metadata,
+                  entity_metadata.sneaking,
+                  sneaking,
+                )
+                |> result.unwrap(entity.metadata),
             )
-            |> result.unwrap(player.entity.metadata)
-
-          let player =
-            player.Player(
-              ..player,
-              entity: entity.Entity(..player.entity, metadata:),
-            )
-
-          update_sessions(game, update.PlayerMetadataUpdated(player))
-          Game(
-            sessions: dict.insert(game.sessions, uuid, #(subject, player)),
-            entities: game.entities,
+          update_sessions(
+            game,
+            update.PlayerMetadataUpdated(entity.id, entity.metadata),
           )
+          Game(..game, entities: dict.insert(game.entities, entity.id, entity))
         }
+        Error(_) -> game
       }
-      actor.continue(game)
+      |> actor.continue()
     }
     command.SwingPlayerArm(uuid, is_dominant) -> {
-      let session = dict.get(game.sessions, uuid)
-      case session {
-        Error(_) -> Nil
-        Ok(#(_, player)) -> {
+      case get_player_entity_id(game, uuid) {
+        Ok(entity_id) -> {
           let animation = case is_dominant {
             True -> entity_animation.SwingDominantArm
             False -> entity_animation.SwingNonDominantArm
           }
           update_other_sessions(
             game,
-            player.entity.uuid,
-            update.EntityAnimation(player.entity.id, animation),
+            uuid,
+            update.EntityAnimation(entity_id, animation),
           )
         }
+        Error(_) -> Nil
       }
       actor.continue(game)
     }
     command.Tick -> actor.continue(game)
     command.Shutdown -> todo
   }
+}
+
+fn get_player_entity_id(game: Game, uuid: uuid.Uuid) {
+  dict.get(game.sessions, uuid)
+  |> result.map(pair.second)
+}
+
+fn get_player_entity(game: Game, uuid: uuid.Uuid) {
+  get_player_entity_id(game, uuid)
+  |> result.map(dict.get(game.entities, _))
+  |> result.flatten
 }
 
 fn update_sessions(game: Game, update: update.Update) {
@@ -178,11 +203,12 @@ fn update_other_sessions(
   update: update.Update,
 ) {
   game.sessions
-  |> dict.values
+  |> dict.to_list
   |> list.each(fn(session) {
-    case uuid.is_equal(current_uuid, { session.1 }.entity.uuid) {
+    let other_uuid = pair.first(session)
+    case uuid.is_equal(current_uuid, other_uuid) {
       True -> Nil
-      False -> process.send(session.0, update)
+      False -> pair.second(session) |> pair.first() |> process.send(update)
     }
   })
 }

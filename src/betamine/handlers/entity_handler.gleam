@@ -1,4 +1,5 @@
 import betamine/common/entity.{type Entity}
+import betamine/common/entity/entity_metadata
 import betamine/common/rotation
 import betamine/protocol/packets/clientbound.{type Packet}
 
@@ -39,4 +40,11 @@ pub fn handle_rotate(id, rotation: rotation.Rotation, on_ground) {
 
 pub fn handle_animation(id, animation) {
   clientbound.AnimateEntity(clientbound.AnimateEntityPacket(id, animation))
+}
+
+pub fn handle_metadata_update(id, metadata) -> Packet {
+  clientbound.SetEntityMetadata(clientbound.SetEntityMetadataPacket(
+    id,
+    entity_metadata.to_protocol(metadata),
+  ))
 }
