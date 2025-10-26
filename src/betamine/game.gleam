@@ -3,8 +3,8 @@ import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
 import betamine/common/entity/entity_metadata
 import betamine/common/entity/player.{type Player}
+import betamine/common/math/vector3
 import betamine/common/uuid
-import betamine/common/vector3
 import betamine/constants
 import betamine/game/command.{type Command}
 import betamine/game/update.{type Update}

@@ -1,6 +1,6 @@
 import betamine/common/identifier
+import betamine/common/math/vector3
 import betamine/common/uuid
-import betamine/common/vector3
 import gleam/option
 
 pub type DataType {

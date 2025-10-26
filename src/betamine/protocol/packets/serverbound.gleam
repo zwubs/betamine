@@ -3,9 +3,9 @@ import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
+import betamine/common/math/vector3.{type Vector3, Vector3}
 import betamine/common/rotation.{type Rotation, Rotation}
 import betamine/common/uuid
-import betamine/common/vector3.{type Vector3, Vector3}
 import betamine/protocol/common
 import betamine/protocol/decoder
 import betamine/protocol/error.{InvalidPacket, UnhandledPacket}

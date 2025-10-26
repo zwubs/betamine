@@ -2,6 +2,7 @@ import betamine/common/difficulty
 import betamine/common/entity/entity_hand
 import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
+import betamine/common/math/vector3
 import betamine/common/profile
 import betamine/common/uuid
 import betamine/constants
@@ -250,6 +251,12 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           game_event: game_event.WaitForChunks,
         )),
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
+        clientbound.SetDefaultSpawnPosition(
+          clientbound.SetDefaultSpawnPositionPacket(
+            position: vector3.truncate(constants.mc_player_spawn_point),
+            angle: 0.0,
+          ),
+        ),
         clientbound.SynchronizePlayerPosition(
           clientbound.SynchronizePlayerPositionPacket(
             player.entity.position,

@@ -1,8 +1,8 @@
 import betamine/common/entity/entity_kind
 import betamine/common/entity/entity_metadata
+import betamine/common/math/vector3
 import betamine/common/rotation
 import betamine/common/uuid
-import betamine/common/vector3
 
 pub type Entity {
   Entity(

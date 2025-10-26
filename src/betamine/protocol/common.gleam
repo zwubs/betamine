@@ -1,6 +1,6 @@
 import betamine/common/identifier
+import betamine/common/math/vector3.{type Vector3}
 import betamine/common/uuid
-import betamine/common/vector3.{type Vector3}
 import betamine/protocol/encoder
 import betamine/protocol/error
 import gleam/bytes_tree.{type BytesTree}

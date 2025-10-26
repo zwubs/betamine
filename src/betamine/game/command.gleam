@@ -1,8 +1,8 @@
 import betamine/common/entity.{type Entity}
 import betamine/common/entity/player.{type Player}
+import betamine/common/math/vector3.{type Vector3}
 import betamine/common/rotation.{type Rotation}
 import betamine/common/uuid
-import betamine/common/vector3.{type Vector3}
 import betamine/game/update
 import gleam/erlang/process.{type Subject}
 

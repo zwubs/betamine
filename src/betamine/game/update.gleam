@@ -1,8 +1,8 @@
 import betamine/common/entity.{type Entity}
 import betamine/common/entity/entity_animation
 import betamine/common/entity/player.{type Player}
+import betamine/common/math/vector3.{type Vector3}
 import betamine/common/rotation.{type Rotation}
-import betamine/common/vector3.{type Vector3}
 
 pub type Update {
   PlayerSpawned(player: Player)

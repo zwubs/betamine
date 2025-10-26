@@ -1,7 +1,7 @@
 import betamine/common/block/block_state
 import betamine/common/identifier
+import betamine/common/math/vector3.{type Vector3}
 import betamine/common/position
-import betamine/common/vector3.{type Vector3}
 import gleam/bit_array
 import gleam/bytes_tree.{type BytesTree}
 import gleam/float
