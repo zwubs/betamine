@@ -8,7 +8,7 @@ import betamine/common/uuid
 pub type Update {
   PlayerSpawned(player: Player)
   PlayerDisconnected(uuid: uuid.Uuid, entity_id: Int)
-  PlayerMetadataUpdated(
+  EntityMetadataUpdated(
     entity_id: Int,
     metadata: entity_metadata.EntityMetadata,
   )

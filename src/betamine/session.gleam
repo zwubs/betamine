@@ -363,7 +363,7 @@ fn handle_game_update(update: update.Update, state: State) {
       send(state, player_handler.handle_spawn(player))
       Ok(state)
     }
-    update.PlayerMetadataUpdated(entity_id, metadata) -> {
+    update.EntityMetadataUpdated(entity_id, metadata) -> {
       send(state, [entity_handler.handle_metadata_update(entity_id, metadata)])
       Ok(state)
     }

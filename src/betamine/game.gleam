@@ -2,6 +2,7 @@ import betamine/common/entity.{type Entity}
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
 import betamine/common/entity/entity_metadata
+import betamine/common/entity/entity_pose
 import betamine/common/entity/player
 import betamine/common/math/vector3
 import betamine/common/profile
@@ -146,11 +147,22 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
                   entity_metadata.sneaking,
                   sneaking,
                 )
+                |> result.map(fn(metadata) {
+                  entity_metadata.set(
+                    metadata,
+                    entity_metadata.pose,
+                    case sneaking {
+                      True -> entity_pose.Crouching
+                      False -> entity_pose.Standing
+                    },
+                  )
+                  |> result.unwrap(metadata)
+                })
                 |> result.unwrap(entity.metadata),
             )
           update_sessions(
             game,
-            update.PlayerMetadataUpdated(entity.id, entity.metadata),
+            update.EntityMetadataUpdated(entity.id, entity.metadata),
           )
           Game(..game, entities: dict.insert(game.entities, entity.id, entity))
         }
