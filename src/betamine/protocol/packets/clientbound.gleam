@@ -5,11 +5,11 @@ import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
 import betamine/common/entity/player/player_game_mode
 import betamine/common/identifier
+import betamine/common/math/vector3.{type Vector3}
 import betamine/common/position
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
 import betamine/common/uuid
-import betamine/common/vector3.{type Vector3}
 import betamine/constants
 import betamine/protocol/common
 import betamine/protocol/common/chunk
@@ -52,6 +52,7 @@ pub type Packet {
   AnimateEntity(packet: AnimateEntityPacket)
   AcknowledgeBlockChange(packet: AcknowledgeBlockChangePacket)
   BlockUpdate(packet: BlockUpdatePacket)
+  SetDefaultSpawnPosition(packet: SetDefaultSpawnPositionPacket)
 }
 
 fn get_packet_id(packet: Packet) -> Int {
@@ -83,6 +84,7 @@ fn get_packet_id(packet: Packet) -> Int {
     AnimateEntity(..) -> 0x03
     AcknowledgeBlockChange(..) -> 0x05
     BlockUpdate(..) -> 0x09
+    SetDefaultSpawnPosition(..) -> 0x56
   }
 }
 
@@ -119,6 +121,10 @@ pub fn encode(packet: Packet) -> BytesTree {
     AnimateEntity(packet) -> encode_animate_entity(_, packet)
     AcknowledgeBlockChange(packet) -> encode_acknowledge_block_change(_, packet)
     BlockUpdate(packet) -> encode_block_update(_, packet)
+    SetDefaultSpawnPosition(packet) -> encode_set_default_spawn_position(
+      _,
+      packet,
+    )
   }
 }
 
@@ -705,4 +711,17 @@ pub fn encode_block_update(tree: BytesTree, packet: BlockUpdatePacket) {
   tree
   |> encoder.position(packet.position)
   |> encoder.block_state(packet.block_state)
+}
+
+pub type SetDefaultSpawnPositionPacket {
+  SetDefaultSpawnPositionPacket(position: position.Position, angle: Float)
+}
+
+pub fn encode_set_default_spawn_position(
+  tree: BytesTree,
+  packet: SetDefaultSpawnPositionPacket,
+) {
+  tree
+  |> encoder.position(packet.position)
+  |> encoder.float(packet.angle)
 }

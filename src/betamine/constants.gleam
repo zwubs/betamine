@@ -1,4 +1,4 @@
-import betamine/common/vector3.{Vector3}
+import betamine/common/math/vector3.{Vector3}
 
 // Hosting Constants
 pub const default_host_port = 25_565

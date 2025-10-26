@@ -1,5 +1,6 @@
 import gleam/float
 import gleam/list
+import gleam/string
 
 pub type Vector3(a) {
   Vector3(x: a, y: a, z: a)
@@ -36,4 +37,9 @@ pub fn fold(
 ) -> b {
   to_list(vector)
   |> list.fold(initial, fun)
+}
+
+pub fn to_string(vector: Vector3(a)) {
+  let values = to_list(vector) |> list.map(string.inspect) |> string.join(", ")
+  "Vector3(" <> values <> ")"
 }
