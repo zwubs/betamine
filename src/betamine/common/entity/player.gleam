@@ -4,11 +4,11 @@ import betamine/common/profile
 import betamine/common/uuid
 
 pub type Player {
-  Player(name: String, entity: entity.Entity, profile: profile.Profile)
+  Player(profile: profile.Profile, entity: entity.Entity)
 }
 
 pub fn new() {
-  Player("", entity: entity.new(entity_kind.Player), profile: profile.default())
+  Player(profile: profile.default(), entity: entity.new(entity_kind.Player))
 }
 
 pub fn with_uuid(player: Player, uuid: uuid.Uuid) {

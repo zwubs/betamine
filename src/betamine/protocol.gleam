@@ -4,8 +4,6 @@ import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import gleam/bytes_tree
-import gleam/int
-import gleam/string
 
 pub fn decode_serverbound(phase: phase.Phase, data: BitArray) {
   let assert Ok(#(_length, data)) = decoder.var_int(data)

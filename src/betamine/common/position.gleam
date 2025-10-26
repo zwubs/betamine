@@ -1,4 +1,4 @@
-import betamine/common/vector3.{type Vector3}
+import betamine/common/math/vector3.{type Vector3}
 import gleam/int
 
 pub type Position =

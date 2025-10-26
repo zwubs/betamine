@@ -1,5 +1,5 @@
+import betamine/common/math/vector3.{Vector3}
 import betamine/common/position.{type Position}
-import betamine/common/vector3.{Vector3}
 import gleeunit/should
 
 const position: Position = Vector3(18_357_644, 831, -20_882_616)

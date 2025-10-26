@@ -71,18 +71,18 @@ pub fn to_type_int(data_type: DataType) {
     NBT(..) -> 16
     Particle(..) -> 17
     Particles(..) -> 18
-    VillagerData(..) -> 18
-    OptionalVarInt(..) -> 19
-    Pose(..) -> 20
-    CatVariant(..) -> 21
-    WolfVariant(..) -> 22
-    FrogVariant(..) -> 23
-    OptionalGlobalPosition(..) -> 24
-    PaintingVariant -> 25
-    SnifferState -> 26
-    AramdilloState -> 27
-    Vector3(..) -> 28
-    Quaternion(..) -> 29
+    VillagerData(..) -> 19
+    OptionalVarInt(..) -> 20
+    Pose(..) -> 21
+    CatVariant(..) -> 22
+    WolfVariant(..) -> 23
+    FrogVariant(..) -> 24
+    OptionalGlobalPosition(..) -> 25
+    PaintingVariant -> 26
+    SnifferState -> 27
+    AramdilloState -> 28
+    Vector3(..) -> 29
+    Quaternion(..) -> 30
   }
 }
 
