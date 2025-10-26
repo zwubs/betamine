@@ -17,6 +17,7 @@ pub fn encode_vector3(
   vector3.fold(vector3, tree, encoder)
 }
 
+// TODO: Adjust velocity encoding to new LPVec3 implementation
 pub fn encode_velocity(tree: BytesTree, velocity: Vector3(Float)) {
   velocity
   |> vector3.map(fn(value) { float.clamp(value, -3.9, 3.9) *. 8000.0 })

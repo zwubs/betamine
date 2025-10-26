@@ -84,7 +84,7 @@ fn get_packet_id(packet: Packet) -> Int {
     AnimateEntity(..) -> 2
     AcknowledgeBlockChange(..) -> 4
     BlockUpdate(..) -> 8
-    SetDefaultSpawnPosition(..) -> 86
+    SetDefaultSpawnPosition(..) -> 95
   }
 }
 
@@ -500,6 +500,8 @@ pub type PlayerInfoUpdateAction {
   UpdateListed
   UpdateLatency
   UpdateDisplayName
+  UpdateListPriority
+  UpdateHat
 }
 
 fn get_player_info_update_action_bit_field(
@@ -518,6 +520,8 @@ fn get_player_info_update_action_bit(action: PlayerInfoUpdateAction) {
     UpdateListed -> 0b00001000
     UpdateLatency -> 0b00010000
     UpdateDisplayName -> 0b00100000
+    UpdateListPriority -> 0b01000000
+    UpdateHat -> 0b10000000
   }
 }
 
@@ -584,7 +588,9 @@ fn encode_spawn_entity(tree: BytesTree, packet: SpawnEntityPacket) {
   |> encoder.var_int(packet.id)
   |> common.encode_uuid(packet.uuid)
   |> encoder.var_int(packet.entity_type |> entity_kind.to_id)
-  |> vector3.fold(packet.position, _, encoder.double)
+  |> common.encode_vector3(packet.position, encoder.double)
+  // TODO: Support new velocity encoding
+  |> encoder.byte(0)
   |> encoder.angle(packet.rotation.pitch)
   |> encoder.angle(packet.rotation.yaw)
   |> encoder.angle(packet.head_rotation)
@@ -592,7 +598,6 @@ fn encode_spawn_entity(tree: BytesTree, packet: SpawnEntityPacket) {
   // Documentation can be found here: https://wiki.vg/Object_Data
   // I probably want to attach this to the entity type.
   |> encoder.var_int(0)
-  |> common.encode_velocity(packet.velocity)
 }
 
 pub type UpdateEntityPositionPacket {
@@ -703,7 +708,11 @@ pub fn encode_block_update(tree: BytesTree, packet: BlockUpdatePacket) {
 }
 
 pub type SetDefaultSpawnPositionPacket {
-  SetDefaultSpawnPositionPacket(position: position.Position, angle: Float)
+  SetDefaultSpawnPositionPacket(
+    dimension: identifier.Identifier,
+    position: position.Position,
+    rotation: rotation.Rotation,
+  )
 }
 
 pub fn encode_set_default_spawn_position(
@@ -711,6 +720,8 @@ pub fn encode_set_default_spawn_position(
   packet: SetDefaultSpawnPositionPacket,
 ) {
   tree
+  |> encoder.identifier(packet.dimension)
   |> encoder.position(packet.position)
-  |> encoder.float(packet.angle)
+  |> encoder.float(packet.rotation.yaw)
+  |> encoder.float(packet.rotation.pitch)
 }

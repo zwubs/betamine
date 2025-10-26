@@ -4,6 +4,7 @@ import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
 import betamine/common/math/vector3
 import betamine/common/profile
+import betamine/common/rotation
 import betamine/common/uuid
 import betamine/constants
 import betamine/game/command
@@ -239,8 +240,9 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
         clientbound.SetDefaultSpawnPosition(
           clientbound.SetDefaultSpawnPositionPacket(
+            dimension: #("minecraft", "overworld"),
             position: vector3.truncate(constants.mc_player_spawn_point),
-            angle: 0.0,
+            rotation: rotation.Rotation(0.0, 0.0),
           ),
         ),
         clientbound.SynchronizePlayerPosition(
