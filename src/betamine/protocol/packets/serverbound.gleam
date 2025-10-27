@@ -307,21 +307,39 @@ pub fn decode_player_command(data: BitArray) {
 }
 
 pub type PlayerInputPacket {
-  PlayerInputPacket(sideways: Float, forward: Float, jump: Bool, dismount: Bool)
+  PlayerInputPacket(
+    forward: Bool,
+    backward: Bool,
+    left: Bool,
+    right: Bool,
+    jump: Bool,
+    sneak: Bool,
+    sprint: Bool,
+  )
 }
 
 pub fn decode_player_input(data: BitArray) {
-  use #(sideways, data) <- result.try(decoder.float(data))
-  use #(forward, data) <- result.try(decoder.float(data))
   use #(flags, _) <- result.try(decoder.bytes_of_length(data, 1))
   case flags {
-    <<_:int-size(6), jump:int-size(1), dismount:int-size(1)>> ->
+    <<
+      0:int-size(1),
+      sprint:int-size(1),
+      sneak:int-size(1),
+      jump:int-size(1),
+      right:int-size(1),
+      left:int-size(1),
+      backward:int-size(1),
+      forward:int-size(1),
+    >> ->
       Ok(
         PlayerInput(PlayerInputPacket(
-          sideways,
-          forward,
+          forward == 1,
+          backward == 1,
+          left == 1,
+          right == 1,
           jump == 1,
-          dismount == 1,
+          sneak == 1,
+          sprint == 1,
         )),
       )
     _ -> Error(error.EndOfData)

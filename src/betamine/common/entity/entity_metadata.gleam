@@ -11,7 +11,6 @@ import gleam/int
 import gleam/option
 import gleam/result
 import gleam/set
-import nbeet
 
 pub opaque type EntityMetadata {
   EntityMetadata(values: dict.Dict(Int, DataType), dirty: set.Set(Int))
@@ -111,7 +110,7 @@ fn set_bit(metadata: EntityMetadata, index: Int, bitmask: Int, value: Bool) {
   use current <- result.try(get_byte(metadata, 0))
   let value = case value {
     True -> int.bitwise_or(current, bitmask)
-    False -> int.bitwise_exclusive_or(current, bitmask)
+    False -> int.bitwise_and(current, int.bitwise_not(bitmask))
   }
   set_byte(metadata, index, value)
 }

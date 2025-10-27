@@ -305,24 +305,12 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       Ok(state)
     }
-    serverbound.PlayerCommand(packet) -> {
-      use sneaking <-
-        fn(apply: fn(Bool) -> Result(State, Error)) -> Result(State, Error) {
-          case packet.action {
-            player_command_action.StartSneaking -> apply(True)
-            player_command_action.StopSneaking -> apply(False)
-            _ -> Ok(state)
-          }
-        }
-
+    serverbound.PlayerCommand(_) -> Ok(state)
+    serverbound.PlayerInput(packet) -> {
       process.send(
         state.game_subject,
-        command.UpdatePlayerSneaking(state.uuid, sneaking),
+        command.UpdatePlayerSneaking(state.uuid, packet.sneak),
       )
-
-      Ok(state)
-    }
-    serverbound.PlayerInput(_) -> {
       Ok(state)
     }
     serverbound.Interact(packet) -> {
