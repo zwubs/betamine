@@ -12,13 +12,13 @@
 ## About
 `betamine` is a Minecraft server written from the ground up in Gleam.
 It utilizes the [`glisten`](https://hex.pm/packages/glisten) package as the basis for it's TCP connection.
-The protocol utilized by `betamine` is documented on the [minecraft.wiki](https://minecraft.wiki/w/Minecraft_Wiki:Projects/wiki.vg_merge) website, which is a great resource if you're interested in getting into the networking side of Minecraft development. Currently the only supported Minecraft version by `betamine` is `1.21.1`.
+The protocol utilized by `betamine` is documented on the [minecraft.wiki](https://minecraft.wiki/w/Minecraft_Wiki:Projects/wiki.vg_merge) website, which is a great resource if you're interested in getting into the networking side of Minecraft development. Currently the only supported Minecraft version by `betamine` is `1.21.10`.
 
 <br>
 
 > [!WARNING]
 > Heads up, `betamine` currently lacks the security features that should be employed by a typical Minecraft server.
-> Please refrain from utilizing `betamine` as a typical Minecraft server, for now it's sole purpose is education and fun.
+> Please refrain from utilizing `betamine` as a typical Minecraft server, for now its sole purpose is education and fun.
 
 ## Getting Started
 
