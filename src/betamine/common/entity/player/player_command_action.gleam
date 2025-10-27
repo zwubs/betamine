@@ -3,8 +3,6 @@ import betamine/protocol/error
 import gleam/result
 
 pub type PlayerCommandAction {
-  StartSneaking
-  StopSneaking
   LeaveBed
   StartSprinting
   StopSprinting
@@ -16,16 +14,14 @@ pub type PlayerCommandAction {
 
 pub fn from_int(int: Int) {
   case int {
-    0 -> Ok(StartSneaking)
-    1 -> Ok(StopSneaking)
-    2 -> Ok(LeaveBed)
-    3 -> Ok(StartSprinting)
-    4 -> Ok(StopSprinting)
-    5 -> Ok(StartHorseJump)
-    6 -> Ok(StopHorseJump)
-    7 -> Ok(OpenVehicleInventory)
-    8 -> Ok(StartElytraFlying)
-    value -> Error(error.InvalidEnumValue("CommandAction", 0, 8, value))
+    0 -> Ok(LeaveBed)
+    1 -> Ok(StartSprinting)
+    2 -> Ok(StopSprinting)
+    3 -> Ok(StartHorseJump)
+    4 -> Ok(StopHorseJump)
+    5 -> Ok(OpenVehicleInventory)
+    6 -> Ok(StartElytraFlying)
+    value -> Error(error.InvalidEnumValue("CommandAction", 0, 6, value))
   }
 }
 

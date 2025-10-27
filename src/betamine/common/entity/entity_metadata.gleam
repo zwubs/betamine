@@ -11,7 +11,6 @@ import gleam/int
 import gleam/option
 import gleam/result
 import gleam/set
-import nbeet
 
 pub opaque type EntityMetadata {
   EntityMetadata(values: dict.Dict(Int, DataType), dirty: set.Set(Int))
@@ -111,7 +110,7 @@ fn set_bit(metadata: EntityMetadata, index: Int, bitmask: Int, value: Bool) {
   use current <- result.try(get_byte(metadata, 0))
   let value = case value {
     True -> int.bitwise_or(current, bitmask)
-    False -> int.bitwise_exclusive_or(current, bitmask)
+    False -> int.bitwise_and(current, int.bitwise_not(bitmask))
   }
   set_byte(metadata, index, value)
 }
@@ -330,26 +329,7 @@ pub const current_sleeping_bed_position = MetadataAccessor(
   set_optional_position,
 )
 
-// Player
-
-pub const additional_hearts = MetadataAccessor(15, get_float, set_float)
-
-pub const score = MetadataAccessor(16, get_var_int, set_var_int)
-
-pub const cape_enabled = MetadataAccessor(17, get_bit_1, set_bit_1)
-
-pub const jacket_enabled = MetadataAccessor(17, get_bit_2, set_bit_2)
-
-pub const left_sleeve_enabled = MetadataAccessor(17, get_bit_3, set_bit_3)
-
-pub const right_sleeve_enabled = MetadataAccessor(17, get_bit_4, set_bit_4)
-
-pub const left_pant_leg_enabled = MetadataAccessor(17, get_bit_5, set_bit_5)
-
-pub const right_pant_leg_enabled = MetadataAccessor(17, get_bit_6, set_bit_6)
-
-pub const hat_enabled = MetadataAccessor(17, get_bit_7, set_bit_7)
-
+// Avatar
 pub fn get_entity_handedness(metadata: EntityMetadata, index: Int) {
   todo
 }
@@ -363,22 +343,54 @@ pub fn set_entity_handedness(
 }
 
 pub const main_hand = MetadataAccessor(
-  18,
+  15,
   get_entity_handedness,
   set_entity_handedness,
 )
 
-pub fn get_nbt(metadata: EntityMetadata, index: Int) {
+pub const cape_enabled = MetadataAccessor(16, get_bit_1, set_bit_1)
+
+pub const jacket_enabled = MetadataAccessor(16, get_bit_2, set_bit_2)
+
+pub const left_sleeve_enabled = MetadataAccessor(16, get_bit_3, set_bit_3)
+
+pub const right_sleeve_enabled = MetadataAccessor(16, get_bit_4, set_bit_4)
+
+pub const left_pant_leg_enabled = MetadataAccessor(16, get_bit_5, set_bit_5)
+
+pub const right_pant_leg_enabled = MetadataAccessor(16, get_bit_6, set_bit_6)
+
+pub const hat_enabled = MetadataAccessor(16, get_bit_7, set_bit_7)
+
+// Player
+
+pub const additional_hearts = MetadataAccessor(17, get_float, set_float)
+
+pub const score = MetadataAccessor(18, get_var_int, set_var_int)
+
+pub fn get_optional_var_int(metadata: EntityMetadata, index: Int) {
   todo
 }
 
-pub fn set_nbt(metadata: EntityMetadata, index: Int, nbt: nbeet.Nbt) {
+pub fn set_optional_var_int(
+  metadata: EntityMetadata,
+  index: Int,
+  var_int: option.Option(Int),
+) {
   todo
 }
 
-pub const left_shoulder_entity_data = MetadataAccessor(19, get_nbt, set_nbt)
+pub const left_shoulder_entity_data = MetadataAccessor(
+  19,
+  get_optional_var_int,
+  set_optional_var_int,
+)
 
-pub const right_shoulder_entity_data = MetadataAccessor(20, get_nbt, set_nbt)
+pub const right_shoulder_entity_data = MetadataAccessor(
+  20,
+  get_optional_var_int,
+  set_optional_var_int,
+)
 
 pub fn new(kind: entity_kind.EntityKind) {
   case kind {
@@ -415,14 +427,20 @@ fn default_living_entity() {
   ]
 }
 
+fn default_avatar() {
+  [
+    #(15, entity_metadata.Byte(1)),
+    #(16, entity_metadata.Byte(0)),
+    ..default_living_entity()
+  ]
+}
+
 fn default_player() {
   [
-    #(15, entity_metadata.Float(0.0)),
-    #(16, entity_metadata.VarInt(0)),
-    #(17, entity_metadata.Byte(0)),
-    #(18, entity_metadata.Byte(1)),
-    #(19, entity_metadata.NBT(nbeet.empty)),
-    #(20, entity_metadata.NBT(nbeet.empty)),
-    ..default_living_entity()
+    #(17, entity_metadata.Float(0.0)),
+    #(18, entity_metadata.VarInt(0)),
+    #(19, entity_metadata.OptionalVarInt(option.None)),
+    #(20, entity_metadata.OptionalVarInt(option.None)),
+    ..default_avatar()
   ]
 }

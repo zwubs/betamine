@@ -41,50 +41,50 @@ pub fn decode(
   case phase {
     phase.Handshaking -> {
       case id {
-        0x00 -> decode_handshake(data)
+        0 -> decode_handshake(data)
         _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Status -> {
       case id {
-        0x00 -> Ok(StatusRequest)
-        0x01 -> decode_ping(data, StatusPing)
+        0 -> Ok(StatusRequest)
+        1 -> decode_ping(data, StatusPing)
         _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Login -> {
       case id {
-        0x00 -> decode_login_start(data)
-        0x03 -> Ok(LoginAcknowledged)
-        id if id <= 0x04 -> Error(UnhandledPacket(phase, id))
+        0 -> decode_login_start(data)
+        3 -> Ok(LoginAcknowledged)
+        id if id <= 4 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Configuration -> {
       case id {
-        0x00 -> decode_client_information(data)
-        0x02 -> decode_plugin(data)
-        0x03 -> Ok(AcknowledgeFinishConfiguration)
-        0x07 -> {
+        0 -> decode_client_information(data)
+        2 -> decode_plugin(data)
+        3 -> Ok(AcknowledgeFinishConfiguration)
+        7 -> {
           decode_known_data_packs(data)
           |> result.map(KnownDataPacks)
         }
-        id if id <= 0x07 -> Error(UnhandledPacket(phase, id))
+        id if id <= 7 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }
     phase.Play -> {
       case id {
-        0x00 -> decode_confirm_teleport(data)
-        0x16 -> decode_interact(data)
-        0x18 -> decode_keep_alive(data)
-        0x1A -> decode_player_position(data)
-        0x1B -> decode_player_position_and_rotation(data)
-        0x1C -> decode_player_rotation(data)
-        0x25 -> decode_player_command(data)
-        0x26 -> decode_player_input(data)
-        0x36 -> decode_swing_arm(data)
-        id if id <= 0x39 -> Error(UnhandledPacket(phase, id))
+        00 -> decode_confirm_teleport(data)
+        25 -> decode_interact(data)
+        27 -> decode_keep_alive(data)
+        29 -> decode_player_position(data)
+        30 -> decode_player_position_and_rotation(data)
+        31 -> decode_player_rotation(data)
+        41 -> decode_player_command(data)
+        42 -> decode_player_input(data)
+        60 -> decode_swing_arm(data)
+        id if id <= 63 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
       }
     }
@@ -307,21 +307,39 @@ pub fn decode_player_command(data: BitArray) {
 }
 
 pub type PlayerInputPacket {
-  PlayerInputPacket(sideways: Float, forward: Float, jump: Bool, dismount: Bool)
+  PlayerInputPacket(
+    forward: Bool,
+    backward: Bool,
+    left: Bool,
+    right: Bool,
+    jump: Bool,
+    sneak: Bool,
+    sprint: Bool,
+  )
 }
 
 pub fn decode_player_input(data: BitArray) {
-  use #(sideways, data) <- result.try(decoder.float(data))
-  use #(forward, data) <- result.try(decoder.float(data))
   use #(flags, _) <- result.try(decoder.bytes_of_length(data, 1))
   case flags {
-    <<_:int-size(6), jump:int-size(1), dismount:int-size(1)>> ->
+    <<
+      0:int-size(1),
+      sprint:int-size(1),
+      sneak:int-size(1),
+      jump:int-size(1),
+      right:int-size(1),
+      left:int-size(1),
+      backward:int-size(1),
+      forward:int-size(1),
+    >> ->
       Ok(
         PlayerInput(PlayerInputPacket(
-          sideways,
-          forward,
+          forward == 1,
+          backward == 1,
+          left == 1,
+          right == 1,
           jump == 1,
-          dismount == 1,
+          sneak == 1,
+          sprint == 1,
         )),
       )
     _ -> Error(error.EndOfData)

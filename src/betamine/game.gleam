@@ -11,8 +11,10 @@ import betamine/constants
 import betamine/game/command.{type Command}
 import betamine/game/update.{type Update}
 import betamine/mojang
+import gleam/bool
 import gleam/dict
 import gleam/erlang/process.{type Subject}
+import gleam/int
 import gleam/list
 import gleam/otp/actor
 import gleam/pair

@@ -12,7 +12,6 @@ pub fn start(game_subject: Subject(command.Command)) {
 pub fn start_with_port(game_subject: Subject(command.Command), port: Int) {
   glisten.new(init(_, game_subject), loop)
   |> glisten.with_close(fn(subject) {
-    echo "Closing Connection."
     process.send(subject, session.Disconnect)
   })
   |> glisten.start(port)

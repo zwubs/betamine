@@ -4,6 +4,7 @@ import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
 import betamine/common/math/vector3
 import betamine/common/profile
+import betamine/common/rotation
 import betamine/common/uuid
 import betamine/constants
 import betamine/game/command
@@ -20,6 +21,7 @@ import betamine/protocol/registry
 import betamine/world
 import gleam/erlang/process.{type Subject}
 import gleam/function
+import gleam/io
 import gleam/list
 import gleam/otp/actor
 import gleam/string
@@ -85,10 +87,7 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
     ServerBoundPacket(data) -> {
       case protocol.decode_serverbound(state.phase, data) {
         Ok(packet) -> handle_server_bound(packet, state)
-        Error(error) -> {
-          echo error
-          Ok(state)
-        }
+        Error(_) -> Ok(state)
       }
     }
     GameUpdate(update) -> handle_game_update(update, state)
@@ -109,8 +108,9 @@ fn handle_error(error: Error, state: State) {
       actor.continue(state)
     }
     UnknownProtocolState(phase) -> {
-      echo "Client Requested An Unknown Protocol State: "
-        <> string.inspect(phase)
+      io.println_error(
+        "Client Requested An Unknown Protocol State: " <> string.inspect(phase),
+      )
       actor.continue(state)
     }
   }
@@ -166,12 +166,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.LoginStart(packet) -> {
       let assert Ok(profile) = mojang.fetch_profile(packet.uuid)
       send(state, [
-        clientbound.LoginSuccess(clientbound.LoginSuccessPacket(
-          username: packet.name,
-          uuid: packet.uuid,
-          properties: profile.properties,
-          strict_error_handling: False,
-        )),
+        clientbound.LoginSuccess(clientbound.LoginSuccessPacket(profile)),
       ])
       Ok(State(..state, profile:, uuid: packet.uuid))
     }
@@ -215,8 +210,8 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     serverbound.KnownDataPacks(_) -> {
       // Finish Configuration
-      registry.send(state.connection)
-      let _ = send(state, [clientbound.FinishConfiguration])
+      send(state, registry.get_packets())
+      send(state, [clientbound.FinishConfiguration])
       Ok(state)
     }
     // Acknowledge Finish Configuration
@@ -245,15 +240,17 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
         clientbound.SetDefaultSpawnPosition(
           clientbound.SetDefaultSpawnPositionPacket(
+            dimension: #("minecraft", "overworld"),
             position: vector3.truncate(constants.mc_player_spawn_point),
-            angle: 0.0,
+            rotation: rotation.Rotation(0.0, 0.0),
           ),
         ),
         clientbound.SynchronizePlayerPosition(
           clientbound.SynchronizePlayerPositionPacket(
-            player.entity.position,
-            player.entity.rotation,
             0,
+            player.entity.position,
+            player.entity.velocity,
+            player.entity.rotation,
             0,
           ),
         ),
@@ -308,24 +305,12 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       Ok(state)
     }
-    serverbound.PlayerCommand(packet) -> {
-      use sneaking <-
-        fn(apply: fn(Bool) -> Result(State, Error)) -> Result(State, Error) {
-          case packet.action {
-            player_command_action.StartSneaking -> apply(True)
-            player_command_action.StopSneaking -> apply(False)
-            _ -> Ok(state)
-          }
-        }
-
+    serverbound.PlayerCommand(_) -> Ok(state)
+    serverbound.PlayerInput(packet) -> {
       process.send(
         state.game_subject,
-        command.UpdatePlayerSneaking(state.uuid, sneaking),
+        command.UpdatePlayerSneaking(state.uuid, packet.sneak),
       )
-
-      Ok(state)
-    }
-    serverbound.PlayerInput(_) -> {
       Ok(state)
     }
     serverbound.Interact(packet) -> {

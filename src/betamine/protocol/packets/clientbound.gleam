@@ -57,34 +57,34 @@ pub type Packet {
 
 fn get_packet_id(packet: Packet) -> Int {
   case packet {
-    StatusResponse(..) -> 0x00
-    StatusPong(..) -> 0x01
-    LoginSuccess(..) -> 0x02
-    Plugin(..) -> 0x01
-    Registry(..) -> 0x07
-    FeatureFlags(..) -> 0x0C
-    UpdateTags(..) -> 0x0D
-    KnownDataPacks(..) -> 0x0E
-    FinishConfiguration -> 0x03
-    Login(..) -> 0x2B
-    ChangeDifficulty(..) -> 0x0B
-    GameEvent(..) -> 0x22
-    SetCenterChunk(..) -> 0x54
-    LevelChunkWithLight(..) -> 0x27
-    PlayerInfoRemove(..) -> 0x3D
-    PlayerInfoUpdate(..) -> 0x3E
-    SynchronizePlayerPosition(..) -> 0x40
-    SpawnEntity(..) -> 0x01
-    UpdateEntityPosition(..) -> 0x2E
-    UpdateEntityRotation(..) -> 0x30
-    SetHeadRotation(..) -> 0x48
-    RemoveEntities(..) -> 0x42
-    PlayKeepAlive(..) -> 0x26
-    SetEntityMetadata(..) -> 0x58
-    AnimateEntity(..) -> 0x03
-    AcknowledgeBlockChange(..) -> 0x05
-    BlockUpdate(..) -> 0x09
-    SetDefaultSpawnPosition(..) -> 0x56
+    StatusResponse(..) -> 0
+    StatusPong(..) -> 1
+    LoginSuccess(..) -> 2
+    Plugin(..) -> 1
+    Registry(..) -> 7
+    FeatureFlags(..) -> 12
+    UpdateTags(..) -> 13
+    KnownDataPacks(..) -> 14
+    FinishConfiguration -> 3
+    Login(..) -> 48
+    ChangeDifficulty(..) -> 10
+    GameEvent(..) -> 38
+    SetCenterChunk(..) -> 92
+    LevelChunkWithLight(..) -> 44
+    PlayerInfoRemove(..) -> 67
+    PlayerInfoUpdate(..) -> 68
+    SynchronizePlayerPosition(..) -> 70
+    SpawnEntity(..) -> 1
+    UpdateEntityPosition(..) -> 51
+    UpdateEntityRotation(..) -> 54
+    SetHeadRotation(..) -> 81
+    RemoveEntities(..) -> 75
+    PlayKeepAlive(..) -> 43
+    SetEntityMetadata(..) -> 97
+    AnimateEntity(..) -> 2
+    AcknowledgeBlockChange(..) -> 4
+    BlockUpdate(..) -> 8
+    SetDefaultSpawnPosition(..) -> 95
   }
 }
 
@@ -183,20 +183,11 @@ fn encode_status_pong(tree: BytesTree, packet: StatusPongPacket) {
 }
 
 pub type LoginSuccessPacket {
-  LoginSuccessPacket(
-    uuid: uuid.Uuid,
-    username: String,
-    properties: List(profile.ProfileProperty),
-    strict_error_handling: Bool,
-  )
+  LoginSuccessPacket(profile: profile.Profile)
 }
 
 fn encode_login_success(tree: BytesTree, packet: LoginSuccessPacket) {
-  tree
-  |> common.encode_uuid(packet.uuid)
-  |> encoder.string(packet.username)
-  |> encoder.array(packet.properties, profile.encode_property)
-  |> encoder.bool(packet.strict_error_handling)
+  common.encode_profile(tree, packet.profile)
 }
 
 pub type PluginPacket {
@@ -298,6 +289,7 @@ pub type LoginPacket {
     is_flat: Bool,
     death_location: Option(DeathLocation),
     portal_cooldown: Int,
+    sea_level: Int,
     enforce_secure_chat: Bool,
   )
 }
@@ -321,6 +313,7 @@ pub const default_login = LoginPacket(
   is_flat: False,
   death_location: None,
   portal_cooldown: 0,
+  sea_level: 0,
   enforce_secure_chat: False,
 )
 
@@ -344,6 +337,7 @@ pub fn encode_login(tree: BytesTree, packet: LoginPacket) {
   |> encoder.bool(packet.is_flat)
   |> encoder.optional(packet.death_location, encode_death_location)
   |> encoder.var_int(packet.portal_cooldown)
+  |> encoder.var_int(packet.sea_level)
   |> encoder.bool(packet.enforce_secure_chat)
 }
 
@@ -389,7 +383,7 @@ pub type LevelChunkWithLightPacket {
   LevelChunkWithLightPacket(
     x: Int,
     z: Int,
-    height_maps: BitArray,
+    heightmaps: List(Nil),
     chunk: chunk.Chunk,
     block_entities: List(Nil),
     sky_light_mask: List(Int),
@@ -407,7 +401,7 @@ pub fn default_level_chunk_with_light_packet() {
   LevelChunkWithLightPacket(
     x: 0,
     z: 0,
-    height_maps: <<0x0A, 0x00>>,
+    heightmaps: [],
     chunk: chunk.default(),
     block_entities: [],
     sky_light_mask: [0b11111111111111111111111111],
@@ -431,7 +425,7 @@ fn encode_level_chunk_with_light(
   tree
   |> encoder.int(packet.x)
   |> encoder.int(packet.z)
-  |> encoder.raw(packet.height_maps)
+  |> encoder.array(packet.heightmaps, fn(_, _) { todo as "Encode heightmaps" })
   |> chunk.encode(packet.chunk)
   |> encoder.array(packet.block_entities, fn(_, _) {
     todo as "Encode block entities"
@@ -450,10 +444,11 @@ fn encode_level_chunk_with_light(
 
 pub type SynchronizePlayerPositionPacket {
   SynchronizePlayerPositionPacket(
+    teleport_id: Int,
     position: Vector3(Float),
+    velocity: Vector3(Float),
     rotation: Rotation,
     flags: Int,
-    teleport_id: Int,
   )
 }
 
@@ -462,13 +457,12 @@ pub fn encode_synchronize_player_position(
   packet: SynchronizePlayerPositionPacket,
 ) {
   tree
-  |> encoder.double(packet.position.x)
-  |> encoder.double(packet.position.y)
-  |> encoder.double(packet.position.z)
+  |> encoder.var_int(packet.teleport_id)
+  |> common.encode_vector3(packet.position, encoder.double)
+  |> common.encode_vector3(packet.velocity, encoder.double)
   |> encoder.float(packet.rotation.yaw)
   |> encoder.float(packet.rotation.pitch)
-  |> encoder.byte(packet.flags)
-  |> encoder.var_int(packet.teleport_id)
+  |> encoder.int(packet.flags)
 }
 
 pub type PlayerInfoRemovePacket {
@@ -506,6 +500,8 @@ pub type PlayerInfoUpdateAction {
   UpdateListed
   UpdateLatency
   UpdateDisplayName
+  UpdateListPriority
+  UpdateHat
 }
 
 fn get_player_info_update_action_bit_field(
@@ -524,6 +520,8 @@ fn get_player_info_update_action_bit(action: PlayerInfoUpdateAction) {
     UpdateListed -> 0b00001000
     UpdateLatency -> 0b00010000
     UpdateDisplayName -> 0b00100000
+    UpdateListPriority -> 0b01000000
+    UpdateHat -> 0b10000000
   }
 }
 
@@ -547,14 +545,9 @@ fn encode_player_info_update_entry(
   entry: PlayerInfoUpdateEntry,
   actions: set.Set(PlayerInfoUpdateAction),
 ) {
-  let tree = common.encode_uuid(tree, entry.uuid)
   let tree = case set.contains(actions, AddPlayer) {
-    True -> {
-      tree
-      |> encoder.string(entry.name)
-      |> encoder.array(entry.profile.properties, profile.encode_property)
-    }
-    False -> tree
+    True -> common.encode_profile(tree, entry.profile)
+    False -> common.encode_uuid(tree, entry.uuid)
   }
   let tree = case set.contains(actions, InitializeChat) {
     True -> encoder.optional(tree, entry.chat_session, chat_session.encode)
@@ -595,7 +588,9 @@ fn encode_spawn_entity(tree: BytesTree, packet: SpawnEntityPacket) {
   |> encoder.var_int(packet.id)
   |> common.encode_uuid(packet.uuid)
   |> encoder.var_int(packet.entity_type |> entity_kind.to_id)
-  |> vector3.fold(packet.position, _, encoder.double)
+  |> common.encode_vector3(packet.position, encoder.double)
+  // TODO: Support new velocity encoding
+  |> encoder.byte(0)
   |> encoder.angle(packet.rotation.pitch)
   |> encoder.angle(packet.rotation.yaw)
   |> encoder.angle(packet.head_rotation)
@@ -603,7 +598,6 @@ fn encode_spawn_entity(tree: BytesTree, packet: SpawnEntityPacket) {
   // Documentation can be found here: https://wiki.vg/Object_Data
   // I probably want to attach this to the entity type.
   |> encoder.var_int(0)
-  |> common.encode_velocity(packet.velocity)
 }
 
 pub type UpdateEntityPositionPacket {
@@ -714,7 +708,11 @@ pub fn encode_block_update(tree: BytesTree, packet: BlockUpdatePacket) {
 }
 
 pub type SetDefaultSpawnPositionPacket {
-  SetDefaultSpawnPositionPacket(position: position.Position, angle: Float)
+  SetDefaultSpawnPositionPacket(
+    dimension: identifier.Identifier,
+    position: position.Position,
+    rotation: rotation.Rotation,
+  )
 }
 
 pub fn encode_set_default_spawn_position(
@@ -722,6 +720,8 @@ pub fn encode_set_default_spawn_position(
   packet: SetDefaultSpawnPositionPacket,
 ) {
   tree
+  |> encoder.identifier(packet.dimension)
   |> encoder.position(packet.position)
-  |> encoder.float(packet.angle)
+  |> encoder.float(packet.rotation.yaw)
+  |> encoder.float(packet.rotation.pitch)
 }
