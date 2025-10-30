@@ -11,6 +11,7 @@ pub fn start(game_subject: Subject(command.Command)) {
 
 pub fn start_with_port(game_subject: Subject(command.Command), port: Int) {
   glisten.new(init(_, game_subject), loop)
+  |> glisten.bind("0.0.0.0")
   |> glisten.with_close(fn(subject) {
     process.send(subject, session.Disconnect)
   })
