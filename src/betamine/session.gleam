@@ -313,6 +313,10 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       Ok(state)
     }
+    serverbound.PlayerLoaded -> {
+      echo state.profile.name <> " Loaded"
+      Ok(state)
+    }
     serverbound.Interact(packet) -> {
       case packet.interaction {
         player_interaction.Attack -> {

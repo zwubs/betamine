@@ -19,7 +19,7 @@ pub const mc_view_distance = 4
 
 pub const mc_simulation_distance = 2
 
-pub const mc_player_spawn_point = Vector3(0.0, 16.0, 0.0)
+pub const mc_player_spawn_point = Vector3(0.0, 1.0, 0.0)
 
 pub const mc_world_chunk_length = 8
 
