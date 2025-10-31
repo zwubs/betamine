@@ -26,7 +26,7 @@ type Game {
 }
 
 type Session {
-  Session(subject: Subject(Update), entity_id: Int)
+  Session(subject: Subject(Update), entity_id: Int, is_recieving: Bool)
 }
 
 pub fn start() -> Result(Subject(Command), actor.StartError) {
@@ -70,7 +70,7 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
       let player = player.Player(profile:, entity:)
       process.send(player_subject, player)
       update_sessions(game, update.PlayerSpawned(player))
-      let session = Session(subject, entity.id)
+      let session = Session(subject, entity.id, False)
       actor.continue(Game(
         sessions: dict.insert(game.sessions, uuid, session),
         profiles: dict.insert(game.profiles, uuid, profile),
@@ -191,8 +191,24 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
       }
       actor.continue(game)
     }
+    command.StartRecievingUpdates(uuid) -> {
+      case dict.get(game.sessions, uuid) {
+        Ok(session) -> {
+          Game(
+            ..game,
+            sessions: dict.insert(
+              game.sessions,
+              uuid,
+              Session(..session, is_recieving: True),
+            ),
+          )
+        }
+        Error(_) -> game
+      }
+      |> actor.continue()
+    }
     command.Tick -> actor.continue(game)
-    command.Shutdown -> todo
+    command.Shutdown -> actor.stop()
   }
 }
 
@@ -210,7 +226,12 @@ fn get_player_entity(game: Game, uuid: uuid.Uuid) {
 fn update_sessions(game: Game, update: update.Update) {
   game.sessions
   |> dict.values
-  |> list.each(fn(session) { process.send(session.subject, update) })
+  |> list.each(fn(session) {
+    case session.is_recieving {
+      True -> process.send(session.subject, update)
+      False -> Nil
+    }
+  })
 }
 
 fn update_other_sessions(
@@ -222,9 +243,9 @@ fn update_other_sessions(
   |> dict.to_list
   |> list.each(fn(pair) {
     let #(other_uuid, other_session) = pair
-    case uuid.is_equal(current_uuid, other_uuid) {
-      True -> Nil
-      False -> process.send(other_session.subject, update)
+    case uuid.is_equal(current_uuid, other_uuid), other_session.is_recieving {
+      False, True -> process.send(other_session.subject, update)
+      _, _ -> Nil
     }
   })
 }
