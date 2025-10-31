@@ -1,6 +1,5 @@
 import betamine/common/difficulty
 import betamine/common/entity/entity_hand
-import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
 import betamine/common/math/vector3
 import betamine/common/profile
@@ -256,14 +255,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         ),
         ..world.generate()
       ])
-
-      process.call(state.game_subject, 1000, command.GetAllPlayers)
-      |> list.filter(fn(other_player) {
-        other_player.profile.id != player.profile.id
-      })
-      |> list.map(player_handler.handle_spawn)
-      |> list.flatten
-      |> send(state, _)
       Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
     }
     serverbound.ConfirmTeleport(_) -> {
@@ -313,6 +304,20 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       Ok(state)
     }
+    serverbound.PlayerLoaded -> {
+      process.call(state.game_subject, 1000, command.GetAllPlayers)
+      |> list.filter(fn(other_player) {
+        other_player.profile.id != state.profile.id
+      })
+      |> list.map(player_handler.handle_spawn)
+      |> list.flatten
+      |> send_bundle(state, _)
+      process.send(
+        state.game_subject,
+        command.StartRecievingUpdates(state.profile.id),
+      )
+      Ok(state)
+    }
     serverbound.Interact(packet) -> {
       case packet.interaction {
         player_interaction.Attack -> {
@@ -342,10 +347,21 @@ fn send(state: State, packets: List(clientbound.Packet)) {
   })
 }
 
+fn send_bundle(state: State, packets: List(clientbound.Packet)) {
+  list.each(
+    [clientbound.BundleDelimiter, ..packets]
+      |> list.append([clientbound.BundleDelimiter]),
+    fn(packet) {
+      let encoded_packet = protocol.encode_clientbound(packet)
+      let assert Ok(Nil) = glisten.send(state.connection, encoded_packet)
+    },
+  )
+}
+
 fn handle_game_update(update: update.Update, state: State) {
   case update {
     update.PlayerSpawned(player) -> {
-      send(state, player_handler.handle_spawn(player))
+      send_bundle(state, player_handler.handle_spawn(player))
       Ok(state)
     }
     update.EntityMetadataUpdated(entity_id, metadata) -> {
@@ -353,6 +369,10 @@ fn handle_game_update(update: update.Update, state: State) {
       Ok(state)
     }
     update.EntityPosition(id, delta, on_ground) -> {
+      case state.profile.name == "Wintermonster" {
+        True -> echo "EntityPosition: " <> vector3.to_string(delta)
+        False -> ""
+      }
       send(state, [entity_handler.handle_move(id, delta, on_ground)])
       Ok(state)
     }

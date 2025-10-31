@@ -11,21 +11,22 @@ import betamine/constants
 import betamine/game/command.{type Command}
 import betamine/game/update.{type Update}
 import betamine/mojang
-import gleam/bool
 import gleam/dict
 import gleam/erlang/process.{type Subject}
-import gleam/int
 import gleam/list
 import gleam/otp/actor
-import gleam/pair
 import gleam/result
 
 type Game {
   Game(
-    sessions: dict.Dict(uuid.Uuid, #(Subject(Update), Int)),
+    sessions: dict.Dict(uuid.Uuid, Session),
     profiles: dict.Dict(uuid.Uuid, profile.Profile),
     entities: dict.Dict(Int, Entity),
   )
+}
+
+type Session {
+  Session(subject: Subject(Update), entity_id: Int, is_recieving: Bool)
 }
 
 pub fn start() -> Result(Subject(Command), actor.StartError) {
@@ -69,8 +70,9 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
       let player = player.Player(profile:, entity:)
       process.send(player_subject, player)
       update_sessions(game, update.PlayerSpawned(player))
+      let session = Session(subject, entity.id, False)
       actor.continue(Game(
-        sessions: dict.insert(game.sessions, uuid, #(subject, entity.id)),
+        sessions: dict.insert(game.sessions, uuid, session),
         profiles: dict.insert(game.profiles, uuid, profile),
         entities: dict.insert(game.entities, entity.id, entity),
       ))
@@ -189,14 +191,30 @@ fn loop(game: Game, command: Command) -> actor.Next(Game, Command) {
       }
       actor.continue(game)
     }
+    command.StartRecievingUpdates(uuid) -> {
+      case dict.get(game.sessions, uuid) {
+        Ok(session) -> {
+          Game(
+            ..game,
+            sessions: dict.insert(
+              game.sessions,
+              uuid,
+              Session(..session, is_recieving: True),
+            ),
+          )
+        }
+        Error(_) -> game
+      }
+      |> actor.continue()
+    }
     command.Tick -> actor.continue(game)
-    command.Shutdown -> todo
+    command.Shutdown -> actor.stop()
   }
 }
 
 fn get_player_entity_id(game: Game, uuid: uuid.Uuid) {
   dict.get(game.sessions, uuid)
-  |> result.map(pair.second)
+  |> result.map(fn(session) { session.entity_id })
 }
 
 fn get_player_entity(game: Game, uuid: uuid.Uuid) {
@@ -208,7 +226,12 @@ fn get_player_entity(game: Game, uuid: uuid.Uuid) {
 fn update_sessions(game: Game, update: update.Update) {
   game.sessions
   |> dict.values
-  |> list.each(fn(session) { process.send(session.0, update) })
+  |> list.each(fn(session) {
+    case session.is_recieving {
+      True -> process.send(session.subject, update)
+      False -> Nil
+    }
+  })
 }
 
 fn update_other_sessions(
@@ -218,11 +241,11 @@ fn update_other_sessions(
 ) {
   game.sessions
   |> dict.to_list
-  |> list.each(fn(session) {
-    let other_uuid = pair.first(session)
-    case uuid.is_equal(current_uuid, other_uuid) {
-      True -> Nil
-      False -> pair.second(session) |> pair.first() |> process.send(update)
+  |> list.each(fn(pair) {
+    let #(other_uuid, other_session) = pair
+    case uuid.is_equal(current_uuid, other_uuid), other_session.is_recieving {
+      False, True -> process.send(other_session.subject, update)
+      _, _ -> Nil
     }
   })
 }

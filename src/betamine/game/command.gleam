@@ -12,6 +12,7 @@ pub type Command {
     player_subject: Subject(player.Player),
     uuid: uuid.Uuid,
   )
+  StartRecievingUpdates(uuid: uuid.Uuid)
   RemovePlayer(uuid: uuid.Uuid)
   MovePlayer(uuid: uuid.Uuid, position: Vector3(Float), on_ground: Bool)
   RotatePlayer(uuid: uuid.Uuid, rotation: Rotation, on_ground: Bool)

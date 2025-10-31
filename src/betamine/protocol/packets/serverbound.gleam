@@ -30,6 +30,7 @@ pub type Packet {
   PlayerRotation(PlayerRotationPacket)
   PlayerCommand(PlayerCommandPacket)
   PlayerInput(PlayerInputPacket)
+  PlayerLoaded
   SwingArm(SwingArmPacket)
 }
 
@@ -83,6 +84,7 @@ pub fn decode(
         31 -> decode_player_rotation(data)
         41 -> decode_player_command(data)
         42 -> decode_player_input(data)
+        43 -> Ok(PlayerLoaded)
         60 -> decode_swing_arm(data)
         id if id <= 63 -> Error(UnhandledPacket(phase, id))
         _ -> Error(InvalidPacket(phase, id))
