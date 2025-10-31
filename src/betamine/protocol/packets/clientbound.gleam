@@ -34,6 +34,7 @@ pub type Packet {
   KnownDataPacks(packet: KnownDataPacksPacket)
   Registry(packet: RegistryPacket)
   FinishConfiguration
+  BundleDelimiter
   Login(packet: LoginPacket)
   ChangeDifficulty(packet: ChangeDifficultyPacket)
   GameEvent(packet: GameEventPacket)
@@ -66,6 +67,7 @@ fn get_packet_id(packet: Packet) -> Int {
     UpdateTags(..) -> 13
     KnownDataPacks(..) -> 14
     FinishConfiguration -> 3
+    BundleDelimiter -> 0
     Login(..) -> 48
     ChangeDifficulty(..) -> 10
     GameEvent(..) -> 38
@@ -100,6 +102,7 @@ pub fn encode(packet: Packet) -> BytesTree {
     UpdateTags(packet) -> encode_update_tags(_, packet)
     KnownDataPacks(packet) -> encode_known_data_packs(_, packet)
     FinishConfiguration -> function.identity
+    BundleDelimiter -> function.identity
     Login(packet) -> encode_login(_, packet)
     ChangeDifficulty(packet) -> encode_change_difficulty(_, packet)
     GameEvent(packet) -> encode_game_event(_, packet)

@@ -263,7 +263,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       })
       |> list.map(player_handler.handle_spawn)
       |> list.flatten
-      |> send(state, _)
+      |> send_bundle(state, _)
       Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
     }
     serverbound.ConfirmTeleport(_) -> {
@@ -346,10 +346,21 @@ fn send(state: State, packets: List(clientbound.Packet)) {
   })
 }
 
+fn send_bundle(state: State, packets: List(clientbound.Packet)) {
+  list.each(
+    [clientbound.BundleDelimiter, ..packets]
+      |> list.append([clientbound.BundleDelimiter]),
+    fn(packet) {
+      let encoded_packet = protocol.encode_clientbound(packet)
+      let assert Ok(Nil) = glisten.send(state.connection, encoded_packet)
+    },
+  )
+}
+
 fn handle_game_update(update: update.Update, state: State) {
   case update {
     update.PlayerSpawned(player) -> {
-      send(state, player_handler.handle_spawn(player))
+      send_bundle(state, player_handler.handle_spawn(player))
       Ok(state)
     }
     update.EntityMetadataUpdated(entity_id, metadata) -> {
