@@ -1,5 +1,6 @@
 import betamine/common/block/block_state
-import betamine/constants.{mc_world_chunk_length, mc_world_chunk_section_height}
+import betamine/constants.{mc_world_chunk_section_height}
+import betamine/perlin
 import betamine/protocol/common/chunk
 import betamine/protocol/common/chunk/chunk_section
 import betamine/protocol/common/chunk/paletted_container
@@ -8,12 +9,26 @@ import gleam/dict
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam/pair
 import gleam/result
-import gleam_community/maths
 import iv
 
-pub fn generate() {
-  let world_chunk_half_length = mc_world_chunk_length / 2
+const octaves = [#(1.0, -8.0), #(2.0, 16.0), #(8.0, 2.0)]
+
+pub type WorldGenerationOptions {
+  WorldGenerationOptions(
+    seed: Float,
+    water_level: Int,
+    chunk_length: Int,
+    max_terrain_height: Int,
+    min_terrain_height: Int,
+  )
+}
+
+pub fn generate(options: WorldGenerationOptions) {
+  let world_chunk_half_length = options.chunk_length / 2
+  let world_block_length = options.chunk_length * 16
+  let world_block_half_length = world_block_length / 2
 
   // The center of a Minecraft world is the intersection of chunk 0,0 & -1,-1
   let world_chunk_min = world_chunk_half_length * -1
@@ -23,7 +38,41 @@ pub fn generate() {
     list.range(0, mc_world_chunk_section_height - 1)
   let relative_chunk_section_range = list.range(0, 15)
 
-  let empty_data = iv.initialise(16 * 16 * 16, fn(_) { block_state.Air })
+  let empty_chunk_section_array =
+    iv.initialise(16 * 16 * 16, fn(_) { block_state.Air })
+
+  let summed_amplitude =
+    list.fold(octaves, 0.0, fn(sum, octave) { sum +. pair.second(octave) })
+
+  let global_noise_map =
+    list.fold(
+      octaves,
+      list.range(0, world_block_length * world_block_length - 1)
+        |> list.map(fn(_) { 0.0 }),
+      fn(array, octave) {
+        let #(frequency, amplitude) = octave
+        list.index_map(array, fn(value, index) {
+          let x =
+            int.to_float(index / world_block_length)
+            /. int.to_float(world_block_length)
+          let z =
+            int.to_float(index % world_block_length)
+            /. int.to_float(world_block_length)
+          value
+          +. perlin.noise(x *. frequency, z *. frequency, options.seed)
+          *. amplitude
+        })
+      },
+    )
+    |> list.index_fold(dict.new(), fn(map, value, index) {
+      let global_x = index / world_block_length - world_block_half_length
+      let global_z = index % world_block_length - world_block_half_length
+      dict.insert(
+        map,
+        #(global_x, global_z),
+        { value /. summed_amplitude +. 1.0 } /. 2.0,
+      )
+    })
 
   list.fold(world_chunk_range, dict.new(), fn(chunks, chunk_x) {
     list.fold(world_chunk_range, chunks, fn(chunks, chunk_z) {
@@ -33,7 +82,7 @@ pub fn generate() {
         fn(chunk_sections, chunk_section_y) {
           list.fold(
             relative_chunk_section_range,
-            empty_data,
+            empty_chunk_section_array,
             fn(array, relative_x) {
               let global_x = chunk_x * 16 + relative_x
               list.fold(
@@ -42,39 +91,37 @@ pub fn generate() {
                 fn(array, relative_z) {
                   let global_z = chunk_z * 16 + relative_z
                   let terrain_y =
-                    float.truncate(
-                      maths.sin(int.to_float(global_x) /. 16.0)
-                      *. maths.sin(int.to_float(global_z) /. 16.0)
-                      *. 8.0,
-                    )
+                    dict.get(global_noise_map, #(global_x, global_z))
+                    |> result.unwrap(0.0)
+                    |> fn(noise) {
+                      options.min_terrain_height
+                      + float.truncate(
+                        noise
+                        *. int.to_float(
+                          options.max_terrain_height
+                          - options.min_terrain_height,
+                        ),
+                      )
+                    }
                   list.fold(
                     relative_chunk_section_range,
                     array,
                     fn(array, relative_y) {
-                      let global_y = { chunk_section_y - 4 } * 16 + relative_y
+                      let global_y =
+                        { chunk_section_y - constants.mc_world_chunk_offset }
+                        * 16
+                        + relative_y
                       let index =
                         relative_y * 256 + relative_z * 16 + relative_x
                       case global_y {
-                        y if y == terrain_y && y < 0 ->
-                          result.unwrap(
-                            iv.set(array, index, block_state.Sand),
-                            array,
-                          )
+                        y if y == terrain_y && y < options.water_level ->
+                          iv.try_set(array, index, block_state.Sand)
                         y if y == terrain_y ->
-                          result.unwrap(
-                            iv.set(array, index, block_state.GrassBlock),
-                            array,
-                          )
+                          iv.try_set(array, index, block_state.GrassBlock)
                         y if y < terrain_y ->
-                          result.unwrap(
-                            iv.set(array, index, block_state.Dirt),
-                            array,
-                          )
-                        y if y > terrain_y && y <= 0 ->
-                          result.unwrap(
-                            iv.set(array, index, block_state.Water),
-                            array,
-                          )
+                          iv.try_set(array, index, block_state.Dirt)
+                        y if y > terrain_y && y <= options.water_level ->
+                          iv.try_set(array, index, block_state.Water)
                         _ -> array
                       }
                     },
