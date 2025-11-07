@@ -253,7 +253,13 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             0,
           ),
         ),
-        ..world.generate()
+        ..world.generate(world.WorldGenerationOptions(
+          seed: 0.0,
+          chunk_length: 8,
+          water_level: 0,
+          min_terrain_height: -16,
+          max_terrain_height: 16,
+        ))
       ])
       Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
     }
