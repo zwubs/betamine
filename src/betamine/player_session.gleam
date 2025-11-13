@@ -85,7 +85,10 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
     ServerBoundPacket(data) -> {
       case protocol.decode_serverbound(state.phase, data) {
         Ok(packet) -> handle_server_bound(packet, state)
-        Error(_) -> Ok(state)
+        Error(error) -> {
+          echo error
+          Ok(state)
+        }
       }
     }
     GameUpdate(update) -> handle_game_update(update, state)
