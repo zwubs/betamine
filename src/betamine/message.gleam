@@ -1,6 +1,8 @@
 import betamine/common/entity/entity_animation
+import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_metadata
 import betamine/common/entity/player
+import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3
 import betamine/common/rotation
 import betamine/common/uuid
@@ -41,5 +43,13 @@ pub type GameMessage {
   RotatePlayer(uuid: uuid.Uuid, rotation: rotation.Rotation, on_ground: Bool)
   GetAllPlayers(subject: process.Subject(List(player.Player)))
   UpdatePlayerSneaking(uuid: uuid.Uuid, sneaking: Bool)
+  UpdatePlayerModelCustomization(
+    uuid: uuid.Uuid,
+    model_customization: player_model_customization.PlayerModelCustomization,
+  )
+  UpdatePlayerMainHand(
+    uuid: uuid.Uuid,
+    handedness: entity_handedness.EntityHandedness,
+  )
   SwingPlayerArm(uuid: uuid.Uuid, is_dominant: Bool)
 }

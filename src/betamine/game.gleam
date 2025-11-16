@@ -147,38 +147,18 @@ fn loop(
       |> actor.continue()
     }
     message.UpdatePlayerSneaking(uuid, sneaking) -> {
-      case get_player_entity(game, uuid) {
-        Ok(entity) -> {
-          let entity =
-            entity.Entity(
-              ..entity,
-              metadata: entity_metadata.set(
-                  entity.metadata,
-                  entity_metadata.sneaking,
-                  sneaking,
-                )
-                |> result.map(fn(metadata) {
-                  entity_metadata.set(
-                    metadata,
-                    entity_metadata.pose,
-                    case sneaking {
-                      True -> entity_pose.Crouching
-                      False -> entity_pose.Standing
-                    },
-                  )
-                  |> result.unwrap(metadata)
-                })
-                |> result.unwrap(entity.metadata),
-            )
-          update_sessions(
-            game,
-            message.EntityMetadataUpdated(entity.id, entity.metadata),
-          )
-          Game(..game, entities: dict.insert(game.entities, entity.id, entity))
-        }
-        Error(_) -> game
+      let pose = case sneaking {
+        True -> entity_pose.Crouching
+        False -> entity_pose.Standing
       }
-      |> actor.continue()
+      let game =
+        game
+        |> set_player_metadata(uuid, entity_metadata.sneaking, sneaking)
+        |> result.unwrap(game)
+        |> set_player_metadata(uuid, entity_metadata.pose, pose)
+        |> result.unwrap(game)
+      send_player_metadata_update(game, uuid)
+      actor.continue(game)
     }
     message.SwingPlayerArm(uuid, is_dominant) -> {
       case get_player_entity_id(game, uuid) {
@@ -195,6 +175,25 @@ fn loop(
         }
         Error(_) -> Nil
       }
+      actor.continue(game)
+    }
+    message.UpdatePlayerModelCustomization(uuid, model_customization) -> {
+      let game =
+        set_player_metadata(
+          game,
+          uuid,
+          entity_metadata.player_model_customization,
+          model_customization,
+        )
+        |> result.unwrap(game)
+      send_player_metadata_update(game, uuid)
+      actor.continue(game)
+    }
+    message.UpdatePlayerMainHand(uuid, handedness) -> {
+      let game =
+        set_player_metadata(game, uuid, entity_metadata.main_hand, handedness)
+        |> result.unwrap(game)
+      send_player_metadata_update(game, uuid)
       actor.continue(game)
     }
     message.StartRecievingUpdates(uuid) -> {
@@ -225,6 +224,35 @@ fn get_player_entity(game: Game, uuid: uuid.Uuid) {
   get_player_entity_id(game, uuid)
   |> result.map(dict.get(game.entities, _))
   |> result.flatten
+}
+
+fn set_player_metadata(
+  game: Game,
+  uuid: uuid.Uuid,
+  accessor: entity_metadata.MetadataAccessor(value),
+  value: value,
+) {
+  get_player_entity(game, uuid)
+  |> result.map(fn(entity) {
+    let metadata =
+      entity_metadata.set(entity.metadata, accessor, value)
+      |> result.unwrap(entity.metadata)
+    let entity = entity.Entity(..entity, metadata:)
+    let entities = dict.insert(game.entities, entity.id, entity)
+    Game(..game, entities:)
+  })
+}
+
+fn send_player_metadata_update(game: Game, uuid: uuid.Uuid) {
+  case get_player_entity(game, uuid) {
+    Ok(entity) -> {
+      update_sessions(
+        game,
+        message.EntityMetadataUpdated(entity.id, entity.metadata),
+      )
+    }
+    Error(_) -> Nil
+  }
 }
 
 fn update_sessions(game: Game, message: message.PlayerSessionMessage) {

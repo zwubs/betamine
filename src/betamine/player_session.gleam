@@ -1,6 +1,8 @@
 import betamine/common/difficulty
 import betamine/common/entity/entity_hand
+import betamine/common/entity/entity_handedness
 import betamine/common/entity/player/player_interaction
+import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3
 import betamine/common/profile
 import betamine/common/rotation
@@ -41,12 +43,14 @@ type State {
     last_keep_alive: Int,
     profile: profile.Profile,
     uuid: uuid.Uuid,
+    main_hand: entity_handedness.EntityHandedness,
+    model_customization: player_model_customization.PlayerModelCustomization,
     ignore_position_packets: Bool,
   )
 }
 
 type Error {
-  UnknownServerBoundPacket(state: phase.Phase, packet: serverbound.Packet)
+  UnknownServerBoundPacket(phase: phase.Phase, packet: serverbound.Packet)
   UnknownProtocolState(state: Int)
 }
 
@@ -70,6 +74,8 @@ pub fn start(
         last_keep_alive: now_seconds(),
         profile: profile.default(),
         uuid: uuid.default,
+        main_hand: entity_handedness.Right,
+        model_customization: player_model_customization.default(),
         ignore_position_packets: True,
       ))
       |> actor.selecting(selector)
@@ -117,7 +123,7 @@ fn handle_error(error: Error, state: State) {
   }
 }
 
-@external(erlang, "now_ffi", "now_seconds")
+@external(erlang, "betamine_ffi", "now_seconds")
 pub fn now_seconds() -> Int
 
 fn handle_server_bound(packet: serverbound.Packet, state: State) {
@@ -173,31 +179,54 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     serverbound.LoginAcknowledged ->
       Ok(State(..state, phase: phase.Configuration))
-    serverbound.ClientInformation(_) -> {
-      send(state, [
-        clientbound.FeatureFlags(
-          clientbound.FeatureFlagsPacket([#("minecraft", "vanilla")]),
-        ),
-        clientbound.UpdateTags(
-          clientbound.UpdateTagsPacket([
-            #(#("minecraft", "fluid"), [
-              // References to the minecraft:fluid registry
-              #(#("minecraft", "lava"), [3, 4]),
-              #(#("minecraft", "water"), [1, 2]),
-            ]),
-          ]),
-        ),
-        clientbound.KnownDataPacks(
-          clientbound.KnownDataPacksPacket([
-            clientbound.KnownDataPack(
-              "minecraft",
-              "core",
-              constants.mc_version_name,
+    serverbound.ClientInformation(packet) -> {
+      case state.phase {
+        phase.Configuration -> {
+          send(state, [
+            clientbound.FeatureFlags(
+              clientbound.FeatureFlagsPacket([#("minecraft", "vanilla")]),
             ),
-          ]),
+            clientbound.UpdateTags(
+              clientbound.UpdateTagsPacket([
+                #(#("minecraft", "fluid"), [
+                  // References to the minecraft:fluid registry
+                  #(#("minecraft", "lava"), [3, 4]),
+                  #(#("minecraft", "water"), [1, 2]),
+                ]),
+              ]),
+            ),
+            clientbound.KnownDataPacks(
+              clientbound.KnownDataPacksPacket([
+                clientbound.KnownDataPack(
+                  "minecraft",
+                  "core",
+                  constants.mc_version_name,
+                ),
+              ]),
+            ),
+          ])
+        }
+        _ -> {
+          process.send(
+            state.game_subject,
+            message.UpdatePlayerMainHand(state.uuid, packet.main_hand),
+          )
+          process.send(
+            state.game_subject,
+            message.UpdatePlayerModelCustomization(
+              state.uuid,
+              packet.model_customizations,
+            ),
+          )
+        }
+      }
+      Ok(
+        State(
+          ..state,
+          main_hand: packet.main_hand,
+          model_customization: packet.model_customizations,
         ),
-      ])
-      Ok(state)
+      )
     }
     serverbound.Plugin(_) -> {
       send(state, [
@@ -223,6 +252,17 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           _,
           state.uuid,
         ))
+      process.send(
+        state.game_subject,
+        message.UpdatePlayerMainHand(state.uuid, state.main_hand),
+      )
+      process.send(
+        state.game_subject,
+        message.UpdatePlayerModelCustomization(
+          state.uuid,
+          state.model_customization,
+        ),
+      )
       send(state, [
         clientbound.Login(
           clientbound.LoginPacket(
@@ -268,7 +308,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.ConfirmTeleport(_) -> {
       Ok(State(..state, ignore_position_packets: False))
     }
-    serverbound.KeepAlive(_) -> Ok(state)
     serverbound.PlayerPosition(packet) -> {
       case state.ignore_position_packets {
         True -> Nil
@@ -304,7 +343,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       Ok(state)
     }
-    serverbound.PlayerCommand(_) -> Ok(state)
     serverbound.PlayerInput(packet) -> {
       process.send(
         state.game_subject,
@@ -345,6 +383,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       Ok(state)
     }
+    _ -> Ok(state)
   }
 }
 

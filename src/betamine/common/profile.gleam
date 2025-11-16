@@ -1,6 +1,4 @@
 import betamine/common/uuid
-import betamine/protocol/encoder
-import gleam/bytes_tree.{type BytesTree}
 import gleam/dynamic/decode
 import gleam/option.{type Option}
 
