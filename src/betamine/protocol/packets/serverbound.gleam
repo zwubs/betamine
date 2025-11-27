@@ -3,6 +3,7 @@ import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
+import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3.{type Vector3, Vector3}
 import betamine/common/rotation.{type Rotation, Rotation}
 import betamine/common/uuid
@@ -23,6 +24,7 @@ pub type Packet {
   AcknowledgeFinishConfiguration
   KnownDataPacks(KnownDataPacksPacket)
   ConfirmTeleport(ConfirmTeleportPacket)
+  ClientTickEnd
   Interact(InteractPacket)
   KeepAlive(KeepAlivePacket)
   PlayerPosition(PlayerPositionPacket)
@@ -77,6 +79,8 @@ pub fn decode(
     phase.Play -> {
       case id {
         00 -> decode_confirm_teleport(data)
+        12 -> Ok(ClientTickEnd)
+        13 -> decode_client_information(data)
         25 -> decode_interact(data)
         27 -> decode_keep_alive(data)
         29 -> decode_player_position(data)
@@ -135,10 +139,10 @@ pub type ClientInformationPacket {
     view_distance: Int,
     chat_mode: chat_mode.ChatMode,
     chat_colors: Bool,
-    model_customizations: Int,
+    model_customizations: player_model_customization.PlayerModelCustomization,
     main_hand: entity_handedness.EntityHandedness,
     text_filtering_enabled: Bool,
-    allow_server_listings: Bool,
+    particle_status: Int,
   )
 }
 
@@ -150,6 +154,8 @@ pub fn decode_client_information(bit_array: BitArray) {
   use #(model_customizations, bit_array) <- result.try(decoder.unsigned_byte(
     bit_array,
   ))
+  let model_customizations =
+    player_model_customization.from_int(model_customizations)
   use #(main_hand, bit_array) <- result.try({
     use #(main_hand, bit_array) <- result.try(decoder.var_int(bit_array))
     result.map(entity_handedness.from_int(main_hand), fn(hand) {
@@ -159,7 +165,7 @@ pub fn decode_client_information(bit_array: BitArray) {
   use #(text_filtering_enabled, bit_array) <- result.try(decoder.boolean(
     bit_array,
   ))
-  use #(allow_server_listings, _) <- result.try(decoder.boolean(bit_array))
+  use #(particle_status, _) <- result.try(decoder.var_int(bit_array))
   Ok(
     ClientInformation(ClientInformationPacket(
       locale,
@@ -169,7 +175,7 @@ pub fn decode_client_information(bit_array: BitArray) {
       model_customizations,
       main_hand,
       text_filtering_enabled,
-      allow_server_listings,
+      particle_status,
     )),
   )
 }

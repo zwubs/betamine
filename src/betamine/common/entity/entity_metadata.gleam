@@ -2,6 +2,7 @@ import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_kind
 import betamine/common/entity/entity_pose
+import betamine/common/entity/player/player_model_customization
 import betamine/common/particle
 import betamine/common/position
 import betamine/common/text_component
@@ -331,7 +332,11 @@ pub const current_sleeping_bed_position = MetadataAccessor(
 
 // Avatar
 pub fn get_entity_handedness(metadata: EntityMetadata, index: Int) {
-  todo
+  case dict.get(metadata.values, index) {
+    Ok(entity_metadata.Byte(byte)) ->
+      entity_handedness.from_int(byte) |> result.replace_error(Nil)
+    _ -> Error(Nil)
+  }
 }
 
 pub fn set_entity_handedness(
@@ -339,7 +344,13 @@ pub fn set_entity_handedness(
   index: Int,
   handedness: entity_handedness.EntityHandedness,
 ) {
-  todo
+  case get_entity_handedness(metadata, index) {
+    Ok(_) -> {
+      let byte = entity_handedness.to_int(handedness)
+      set_value(metadata, index, entity_metadata.Byte(byte))
+    }
+    _ -> Error(Nil)
+  }
 }
 
 pub const main_hand = MetadataAccessor(
@@ -348,19 +359,33 @@ pub const main_hand = MetadataAccessor(
   set_entity_handedness,
 )
 
-pub const cape_enabled = MetadataAccessor(16, get_bit_1, set_bit_1)
+pub fn get_player_model_customization(metadata: EntityMetadata, index: Int) {
+  case dict.get(metadata.values, index) {
+    Ok(entity_metadata.Byte(byte)) ->
+      Ok(player_model_customization.from_int(byte))
+    _ -> Error(Nil)
+  }
+}
 
-pub const jacket_enabled = MetadataAccessor(16, get_bit_2, set_bit_2)
+pub fn set_player_model_customization(
+  metadata: EntityMetadata,
+  index: Int,
+  model_customization: player_model_customization.PlayerModelCustomization,
+) {
+  case get_player_model_customization(metadata, index) {
+    Ok(_) -> {
+      let byte = player_model_customization.to_int(model_customization)
+      set_value(metadata, index, entity_metadata.Byte(byte))
+    }
+    _ -> Error(Nil)
+  }
+}
 
-pub const left_sleeve_enabled = MetadataAccessor(16, get_bit_3, set_bit_3)
-
-pub const right_sleeve_enabled = MetadataAccessor(16, get_bit_4, set_bit_4)
-
-pub const left_pant_leg_enabled = MetadataAccessor(16, get_bit_5, set_bit_5)
-
-pub const right_pant_leg_enabled = MetadataAccessor(16, get_bit_6, set_bit_6)
-
-pub const hat_enabled = MetadataAccessor(16, get_bit_7, set_bit_7)
+pub const player_model_customization = MetadataAccessor(
+  16,
+  get_player_model_customization,
+  set_player_model_customization,
+)
 
 // Player
 

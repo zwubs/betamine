@@ -18,13 +18,13 @@ pub fn default() {
 
 pub fn to_int(customization: PlayerModelCustomization) {
   0
-  |> accumulate(customization.cape_enabled, 0x01)
-  |> accumulate(customization.jacket_enabled, 0x02)
-  |> accumulate(customization.left_sleeve_enabled, 0x04)
-  |> accumulate(customization.right_sleeve_enabled, 0x08)
-  |> accumulate(customization.left_pant_enabled, 0x10)
-  |> accumulate(customization.right_pant_enabled, 0x20)
-  |> accumulate(customization.hat_enabled, 0x40)
+  |> accumulate(customization.cape_enabled, 0b00000001)
+  |> accumulate(customization.jacket_enabled, 0b00000010)
+  |> accumulate(customization.left_sleeve_enabled, 0b00000100)
+  |> accumulate(customization.right_sleeve_enabled, 0b00001000)
+  |> accumulate(customization.left_pant_enabled, 0b00010000)
+  |> accumulate(customization.right_pant_enabled, 0b0010000)
+  |> accumulate(customization.hat_enabled, 0b01000000)
 }
 
 fn accumulate(accumulator: Int, bool: Bool, bit: Int) {
@@ -36,12 +36,12 @@ fn accumulate(accumulator: Int, bool: Bool, bit: Int) {
 
 pub fn from_int(int: Int) {
   PlayerModelCustomization(
-    cape_enabled: int.bitwise_and(int, 0x01) != 1,
-    jacket_enabled: int.bitwise_and(int, 0x02) != 1,
-    left_sleeve_enabled: int.bitwise_and(int, 0x04) != 1,
-    right_sleeve_enabled: int.bitwise_and(int, 0x08) != 1,
-    left_pant_enabled: int.bitwise_and(int, 0x10) != 1,
-    right_pant_enabled: int.bitwise_and(int, 0x20) != 1,
-    hat_enabled: int.bitwise_and(int, 0x40) != 1,
+    cape_enabled: int.bitwise_and(int, 0b00000001) != 1,
+    jacket_enabled: int.bitwise_and(int, 0b00000010) != 1,
+    left_sleeve_enabled: int.bitwise_and(int, 0b00000100) != 1,
+    right_sleeve_enabled: int.bitwise_and(int, 0b00001000) != 1,
+    left_pant_enabled: int.bitwise_and(int, 0b00010000) != 1,
+    right_pant_enabled: int.bitwise_and(int, 0b0010000) != 1,
+    hat_enabled: int.bitwise_and(int, 0b01000000) != 1,
   )
 }

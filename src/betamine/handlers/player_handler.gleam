@@ -10,7 +10,11 @@ import gleam/set
 pub fn handle_add(profile: profile.Profile) -> Packet {
   clientbound.PlayerInfoUpdate(
     clientbound.PlayerInfoUpdatePacket(
-      actions: set.from_list([clientbound.AddPlayer]),
+      actions: set.from_list([
+        clientbound.AddPlayer,
+        clientbound.UpdateListed,
+        clientbound.UpdateHat,
+      ]),
       entries: [
         clientbound.PlayerInfoUpdateEntry(
           uuid: profile.id,
@@ -21,6 +25,7 @@ pub fn handle_add(profile: profile.Profile) -> Packet {
           game_mode: player_game_mode.Survival,
           chat_session: option.None,
           display_name: option.Some(profile.name),
+          hat_visible: True,
         ),
       ],
     ),

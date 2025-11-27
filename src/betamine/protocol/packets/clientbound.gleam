@@ -538,6 +538,7 @@ pub type PlayerInfoUpdateEntry {
     game_mode: player_game_mode.PlayerGameMode,
     chat_session: Option(chat_session.ChatSession),
     display_name: Option(String),
+    hat_visible: Bool,
   )
 }
 
@@ -570,6 +571,10 @@ fn encode_player_info_update_entry(
   }
   case set.contains(actions, UpdateDisplayName) {
     True -> encoder.optional(tree, entry.display_name, encoder.string)
+    False -> tree
+  }
+  case set.contains(actions, UpdateHat) {
+    True -> encoder.bool(tree, entry.hat_visible)
     False -> tree
   }
 }

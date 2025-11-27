@@ -1,15 +1,16 @@
 import betamine/common/difficulty
 import betamine/common/entity/entity_hand
+import betamine/common/entity/entity_handedness
 import betamine/common/entity/player/player_interaction
+import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3
 import betamine/common/profile
 import betamine/common/rotation
 import betamine/common/uuid
 import betamine/constants
-import betamine/game/command
-import betamine/game/update
 import betamine/handlers/entity_handler
 import betamine/handlers/player_handler
+import betamine/message
 import betamine/mojang
 import betamine/protocol
 import betamine/protocol/common/game_event
@@ -28,31 +29,33 @@ import glisten
 
 pub type Packet {
   ServerBoundPacket(data: BitArray)
-  GameUpdate(update.Update)
+  GameUpdate(message.PlayerSessionMessage)
   Disconnect
 }
 
 type State {
   State(
     subject_for_host: Subject(Packet),
-    game_subject: Subject(command.Command),
-    subject_for_game: Subject(update.Update),
+    game_subject: Subject(message.GameMessage),
+    subject_for_game: Subject(message.PlayerSessionMessage),
     connection: glisten.Connection(BitArray),
     phase: phase.Phase,
     last_keep_alive: Int,
     profile: profile.Profile,
     uuid: uuid.Uuid,
+    main_hand: entity_handedness.EntityHandedness,
+    model_customization: player_model_customization.PlayerModelCustomization,
     ignore_position_packets: Bool,
   )
 }
 
 type Error {
-  UnknownServerBoundPacket(state: phase.Phase, packet: serverbound.Packet)
+  UnknownServerBoundPacket(phase: phase.Phase, packet: serverbound.Packet)
   UnknownProtocolState(state: Int)
 }
 
 pub fn start(
-  game_subject: Subject(command.Command),
+  game_subject: Subject(message.GameMessage),
   connection: glisten.Connection(BitArray),
 ) -> Result(actor.Started(Subject(Packet)), actor.StartError) {
   actor.new_with_initialiser(1000, fn(subject_for_host) {
@@ -71,6 +74,8 @@ pub fn start(
         last_keep_alive: now_seconds(),
         profile: profile.default(),
         uuid: uuid.default,
+        main_hand: entity_handedness.Right,
+        model_customization: player_model_customization.default(),
         ignore_position_packets: True,
       ))
       |> actor.selecting(selector)
@@ -86,12 +91,15 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
     ServerBoundPacket(data) -> {
       case protocol.decode_serverbound(state.phase, data) {
         Ok(packet) -> handle_server_bound(packet, state)
-        Error(_) -> Ok(state)
+        Error(error) -> {
+          echo error
+          Ok(state)
+        }
       }
     }
     GameUpdate(update) -> handle_game_update(update, state)
     Disconnect -> {
-      process.send(state.game_subject, command.RemovePlayer(state.uuid))
+      process.send(state.game_subject, message.RemovePlayer(state.uuid))
       Ok(state)
     }
   }
@@ -115,7 +123,7 @@ fn handle_error(error: Error, state: State) {
   }
 }
 
-@external(erlang, "now_ffi", "now_seconds")
+@external(erlang, "betamine_ffi", "now_seconds")
 pub fn now_seconds() -> Int
 
 fn handle_server_bound(packet: serverbound.Packet, state: State) {
@@ -171,31 +179,54 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     }
     serverbound.LoginAcknowledged ->
       Ok(State(..state, phase: phase.Configuration))
-    serverbound.ClientInformation(_) -> {
-      send(state, [
-        clientbound.FeatureFlags(
-          clientbound.FeatureFlagsPacket([#("minecraft", "vanilla")]),
-        ),
-        clientbound.UpdateTags(
-          clientbound.UpdateTagsPacket([
-            #(#("minecraft", "fluid"), [
-              // References to the minecraft:fluid registry
-              #(#("minecraft", "lava"), [3, 4]),
-              #(#("minecraft", "water"), [1, 2]),
-            ]),
-          ]),
-        ),
-        clientbound.KnownDataPacks(
-          clientbound.KnownDataPacksPacket([
-            clientbound.KnownDataPack(
-              "minecraft",
-              "core",
-              constants.mc_version_name,
+    serverbound.ClientInformation(packet) -> {
+      case state.phase {
+        phase.Configuration -> {
+          send(state, [
+            clientbound.FeatureFlags(
+              clientbound.FeatureFlagsPacket([#("minecraft", "vanilla")]),
             ),
-          ]),
+            clientbound.UpdateTags(
+              clientbound.UpdateTagsPacket([
+                #(#("minecraft", "fluid"), [
+                  // References to the minecraft:fluid registry
+                  #(#("minecraft", "lava"), [3, 4]),
+                  #(#("minecraft", "water"), [1, 2]),
+                ]),
+              ]),
+            ),
+            clientbound.KnownDataPacks(
+              clientbound.KnownDataPacksPacket([
+                clientbound.KnownDataPack(
+                  "minecraft",
+                  "core",
+                  constants.mc_version_name,
+                ),
+              ]),
+            ),
+          ])
+        }
+        _ -> {
+          process.send(
+            state.game_subject,
+            message.UpdatePlayerMainHand(state.uuid, packet.main_hand),
+          )
+          process.send(
+            state.game_subject,
+            message.UpdatePlayerModelCustomization(
+              state.uuid,
+              packet.model_customizations,
+            ),
+          )
+        }
+      }
+      Ok(
+        State(
+          ..state,
+          main_hand: packet.main_hand,
+          model_customization: packet.model_customizations,
         ),
-      ])
-      Ok(state)
+      )
     }
     serverbound.Plugin(_) -> {
       send(state, [
@@ -216,11 +247,22 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     // Acknowledge Finish Configuration
     serverbound.AcknowledgeFinishConfiguration -> {
       let player =
-        process.call(state.game_subject, 1000, command.SpawnPlayer(
+        process.call(state.game_subject, 1000, message.SpawnPlayer(
           state.subject_for_game,
           _,
           state.uuid,
         ))
+      process.send(
+        state.game_subject,
+        message.UpdatePlayerMainHand(state.uuid, state.main_hand),
+      )
+      process.send(
+        state.game_subject,
+        message.UpdatePlayerModelCustomization(
+          state.uuid,
+          state.model_customization,
+        ),
+      )
       send(state, [
         clientbound.Login(
           clientbound.LoginPacket(
@@ -266,14 +308,13 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.ConfirmTeleport(_) -> {
       Ok(State(..state, ignore_position_packets: False))
     }
-    serverbound.KeepAlive(_) -> Ok(state)
     serverbound.PlayerPosition(packet) -> {
       case state.ignore_position_packets {
         True -> Nil
         False -> {
           process.send(
             state.game_subject,
-            command.MovePlayer(state.uuid, packet.position, packet.on_ground),
+            message.MovePlayer(state.uuid, packet.position, packet.on_ground),
           )
         }
       }
@@ -285,33 +326,32 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         False -> {
           process.send(
             state.game_subject,
-            command.MovePlayer(state.uuid, packet.position, packet.on_ground),
+            message.MovePlayer(state.uuid, packet.position, packet.on_ground),
           )
         }
       }
       process.send(
         state.game_subject,
-        command.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
+        message.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
       )
       Ok(state)
     }
     serverbound.PlayerRotation(packet) -> {
       process.send(
         state.game_subject,
-        command.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
+        message.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
       )
       Ok(state)
     }
-    serverbound.PlayerCommand(_) -> Ok(state)
     serverbound.PlayerInput(packet) -> {
       process.send(
         state.game_subject,
-        command.UpdatePlayerSneaking(state.uuid, packet.sneak),
+        message.UpdatePlayerSneaking(state.uuid, packet.sneak),
       )
       Ok(state)
     }
     serverbound.PlayerLoaded -> {
-      process.call(state.game_subject, 1000, command.GetAllPlayers)
+      process.call(state.game_subject, 1000, message.GetAllPlayers)
       |> list.filter(fn(other_player) {
         other_player.profile.id != state.profile.id
       })
@@ -320,7 +360,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       |> send_bundle(state, _)
       process.send(
         state.game_subject,
-        command.StartRecievingUpdates(state.profile.id),
+        message.StartRecievingUpdates(state.profile.id),
       )
       Ok(state)
     }
@@ -329,7 +369,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         player_interaction.Attack -> {
           process.send(
             state.game_subject,
-            command.SwingPlayerArm(state.uuid, True),
+            message.SwingPlayerArm(state.uuid, True),
           )
         }
         _ -> Nil
@@ -339,10 +379,11 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.SwingArm(packet) -> {
       process.send(
         state.game_subject,
-        command.SwingPlayerArm(state.uuid, packet.hand == entity_hand.Dominant),
+        message.SwingPlayerArm(state.uuid, packet.hand == entity_hand.Dominant),
       )
       Ok(state)
     }
+    _ -> Ok(state)
   }
 }
 
@@ -364,33 +405,29 @@ fn send_bundle(state: State, packets: List(clientbound.Packet)) {
   )
 }
 
-fn handle_game_update(update: update.Update, state: State) {
-  case update {
-    update.PlayerSpawned(player) -> {
+fn handle_game_update(message: message.PlayerSessionMessage, state: State) {
+  case message {
+    message.PlayerSpawned(player) -> {
       send_bundle(state, player_handler.handle_spawn(player))
       Ok(state)
     }
-    update.EntityMetadataUpdated(entity_id, metadata) -> {
+    message.EntityMetadataUpdated(entity_id, metadata) -> {
       send(state, [entity_handler.handle_metadata_update(entity_id, metadata)])
       Ok(state)
     }
-    update.EntityPosition(id, delta, on_ground) -> {
-      case state.profile.name == "Wintermonster" {
-        True -> echo "EntityPosition: " <> vector3.to_string(delta)
-        False -> ""
-      }
+    message.EntityPositionUpdated(id, delta, on_ground) -> {
       send(state, [entity_handler.handle_move(id, delta, on_ground)])
       Ok(state)
     }
-    update.EntityRotation(id, rotation, on_ground) -> {
+    message.EntityRotationUpdated(id, rotation, on_ground) -> {
       send(state, entity_handler.handle_rotate(id, rotation, on_ground))
       Ok(state)
     }
-    update.PlayerDisconnected(uuid, entity_id) -> {
+    message.PlayerDisconnected(uuid, entity_id) -> {
       send(state, player_handler.handle_disconnect(uuid, entity_id))
       Ok(state)
     }
-    update.EntityAnimation(id, animation) -> {
+    message.EntityAnimationTriggered(id, animation) -> {
       send(state, [entity_handler.handle_animation(id, animation)])
       Ok(state)
     }

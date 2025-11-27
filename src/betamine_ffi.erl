@@ -1,4 +1,4 @@
--module(now_ffi).
+-module(betamine_ffi).
 
 -export([
     now_seconds/0
