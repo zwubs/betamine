@@ -1,4 +1,3 @@
-import betamine/common/block/block_property
 import betamine/common/block/block_state
 import betamine/constants.{mc_world_chunk_section_height}
 import betamine/perlin
