@@ -115,13 +115,13 @@ pub fn generate(options: WorldGenerationOptions) {
                         relative_y * 256 + relative_z * 16 + relative_x
                       case global_y {
                         y if y == terrain_y && y < options.water_level ->
-                          iv.try_set(array, index, block_state.Sand)
+                          iv.try_set(array, index, block_state.sand)
                         y if y == terrain_y ->
-                          iv.try_set(array, index, block_state.GrassBlock)
+                          iv.try_set(array, index, block_state.grass_block)
                         y if y < terrain_y ->
-                          iv.try_set(array, index, block_state.Dirt)
+                          iv.try_set(array, index, block_state.dirt)
                         y if y > terrain_y && y <= options.water_level ->
-                          iv.try_set(array, index, block_state.Water)
+                          iv.try_set(array, index, block_state.water)
                         _ -> array
                       }
                     },
