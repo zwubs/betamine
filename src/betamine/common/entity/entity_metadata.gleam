@@ -345,10 +345,7 @@ pub fn set_entity_handedness(
   handedness: entity_handedness.EntityHandedness,
 ) {
   case get_entity_handedness(metadata, index) {
-    Ok(_) -> {
-      let byte = entity_handedness.to_int(handedness)
-      set_value(metadata, index, entity_metadata.Byte(byte))
-    }
+    Ok(_) -> set_value(metadata, index, entity_metadata.HumanoidArm(handedness))
     _ -> Error(Nil)
   }
 }
@@ -454,7 +451,7 @@ fn default_living_entity() {
 
 fn default_avatar() {
   [
-    #(15, entity_metadata.Byte(1)),
+    #(15, entity_metadata.HumanoidArm(entity_handedness.Right)),
     #(16, entity_metadata.Byte(0)),
     ..default_living_entity()
   ]
