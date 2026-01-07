@@ -1,3 +1,4 @@
+import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_pose
 import betamine/common/global_position
 import betamine/common/position
@@ -53,6 +54,7 @@ pub type DataType {
   Vector3(Float, Float, Float)
   Quaternion(Float, Float, Float, Float)
   ResolvableProfile
+  HumanoidArm(entity_handedness.EntityHandedness)
 }
 
 pub fn to_type_int(data_type: DataType) {
@@ -94,6 +96,7 @@ pub fn to_type_int(data_type: DataType) {
     Vector3(..) -> 34
     Quaternion(..) -> 35
     ResolvableProfile(..) -> 36
+    HumanoidArm(..) -> 37
   }
 }
 
@@ -140,6 +143,10 @@ fn encode_data_type(bytes_tree: bytes_tree.BytesTree, data_type: DataType) {
     )
     Vector3(x, y, z) -> list.fold([x, y, z], _, encoder.float)
     Quaternion(x, y, z, w) -> list.fold([x, y, z, w], _, encoder.float)
+    HumanoidArm(entity_handedness) -> encoder.byte(
+      _,
+      entity_handedness.to_int(entity_handedness),
+    )
     _ -> todo as "Unhandled metadata type"
   }
 }
