@@ -18,7 +18,6 @@ import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import betamine/protocol/registry
-import betamine/world
 import gleam/erlang/process.{type Subject}
 import gleam/function
 import gleam/io
@@ -38,6 +37,8 @@ type State {
     subject_for_host: Subject(Packet),
     game_subject: Subject(message.GameMessage),
     subject_for_game: Subject(message.PlayerSessionMessage),
+    world_subject: Subject(message.WorldMessage),
+    subject_for_world: Subject(message.PlayerSessionMessage),
     connection: glisten.Connection(BitArray),
     phase: phase.Phase,
     last_keep_alive: Int,
@@ -56,9 +57,11 @@ type Error {
 
 pub fn start(
   game_subject: Subject(message.GameMessage),
+  world_subject: Subject(message.WorldMessage),
   connection: glisten.Connection(BitArray),
 ) -> Result(actor.Started(Subject(Packet)), actor.StartError) {
   actor.new_with_initialiser(1000, fn(subject_for_host) {
+    let subject_for_world = process.new_subject()
     let subject_for_game = process.new_subject()
     let selector =
       process.new_selector()
@@ -69,6 +72,8 @@ pub fn start(
         subject_for_host:,
         game_subject:,
         subject_for_game:,
+        world_subject:,
+        subject_for_world:,
         connection:,
         phase: phase.Handshaking,
         last_keep_alive: now_seconds(),
@@ -263,6 +268,20 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           state.model_customization,
         ),
       )
+      let chunks = process.call(state.world_subject, 1000, message.GetAllChunks)
+      let chunk_packets =
+        list.map(chunks, fn(pair) {
+          let #(#(x, z), chunk) = pair
+          clientbound.LevelChunkWithLight(
+            clientbound.LevelChunkWithLightPacket(
+              ..clientbound.default_level_chunk_with_light_packet(),
+              x:,
+              z:,
+              chunk:,
+            ),
+          )
+        })
+
       send(state, [
         clientbound.Login(
           clientbound.LoginPacket(
@@ -295,13 +314,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             0,
           ),
         ),
-        ..world.generate(world.WorldGenerationOptions(
-          seed: 0.0,
-          chunk_length: 8,
-          water_level: 0,
-          min_terrain_height: -16,
-          max_terrain_height: 16,
-        ))
+        ..chunk_packets
       ])
       Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
     }

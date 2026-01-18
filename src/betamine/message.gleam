@@ -1,3 +1,4 @@
+import betamine/common/block/block_state
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_metadata
@@ -6,6 +7,7 @@ import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3
 import betamine/common/rotation
 import betamine/common/uuid
+import betamine/protocol/common/chunk
 import gleam/erlang/process
 
 pub type PlayerSessionMessage {
@@ -52,4 +54,23 @@ pub type GameMessage {
     handedness: entity_handedness.EntityHandedness,
   )
   SwingPlayerArm(uuid: uuid.Uuid, is_dominant: Bool)
+}
+
+pub type WorldMessage {
+  GenerateWorld
+  GetAllChunks(subject: process.Subject(List(#(#(Int, Int), chunk.Chunk))))
+  GetChunk(subject: process.Subject(Result(chunk.Chunk, Nil)), x: Int, z: Int)
+  GetBlock(
+    subject: process.Subject(Result(block_state.BlockState, Nil)),
+    x: Int,
+    y: Int,
+    z: Int,
+  )
+  PlaceBlock(
+    subject: process.Subject(Result(block_state.BlockState, Nil)),
+    x: Int,
+    y: Int,
+    z: Int,
+    state: block_state.BlockState,
+  )
 }
