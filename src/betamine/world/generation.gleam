@@ -44,8 +44,8 @@ pub fn generate_chunk(x: Int, z: Int, options: ChunkGenerationOptions) {
       fn(array, octave) {
         let #(frequency, amplitude) = octave
         list.index_map(array, fn(value, index) {
-          let x = int.to_float(index / 16 + block_x) /. 16.0
-          let z = int.to_float(index % 16 + block_z) /. 16.0
+          let x = int.to_float(index / 16 + block_x) /. 64.0
+          let z = int.to_float(index % 16 + block_z) /. 64.0
           value
           +. perlin.noise(x *. frequency, z *. frequency, options.seed)
           *. amplitude
@@ -53,11 +53,9 @@ pub fn generate_chunk(x: Int, z: Int, options: ChunkGenerationOptions) {
       },
     )
     |> list.index_fold(dict.new(), fn(map, value, index) {
-      let relative_x = index / 16
-      let relative_z = index % 16
       dict.insert(
         map,
-        #(relative_x, relative_z),
+        #(index / 16, index % 16),
         { value /. summed_amplitude +. 1.0 } /. 2.0,
       )
     })
@@ -81,10 +79,7 @@ pub fn generate_chunk(x: Int, z: Int, options: ChunkGenerationOptions) {
               )
             }
           list.fold(relative_chunk_section_range, array, fn(array, relative_y) {
-            let global_y =
-              { chunk_section_y - constants.mc_world_chunk_offset }
-              * 16
-              + relative_y
+            let global_y = chunk_section_y * 16 + relative_y
             let index = relative_y * 256 + relative_z * 16 + relative_x
             case global_y {
               y if y == terrain_y && y < options.water_level ->
@@ -127,7 +122,10 @@ pub fn generate(options: WorldGenerationOptions) {
   let world_chunk_max = world_chunk_half_length - 1
   let world_chunk_range = list.range(world_chunk_min, world_chunk_max)
   let world_chunk_section_range =
-    list.range(0, mc_world_chunk_section_height - 1)
+    list.range(
+      constants.mc_world_chunk_offset,
+      mc_world_chunk_section_height + constants.mc_world_chunk_offset - 1,
+    )
   let relative_chunk_section_range = list.range(0, 15)
 
   let empty_chunk_section_array =
@@ -145,11 +143,11 @@ pub fn generate(options: WorldGenerationOptions) {
         let #(frequency, amplitude) = octave
         list.index_map(array, fn(value, index) {
           let x =
-            int.to_float(index / world_block_length)
-            /. int.to_float(world_block_length)
+            int.to_float(index / world_block_length - world_block_half_length)
+            /. 128.0
           let z =
-            int.to_float(index % world_block_length)
-            /. int.to_float(world_block_length)
+            int.to_float(index % world_block_length - world_block_half_length)
+            /. 128.0
           value
           +. perlin.noise(x *. frequency, z *. frequency, options.seed)
           *. amplitude
@@ -165,7 +163,6 @@ pub fn generate(options: WorldGenerationOptions) {
         { value /. summed_amplitude +. 1.0 } /. 2.0,
       )
     })
-
   list.fold(world_chunk_range, dict.new(), fn(chunks, chunk_x) {
     list.fold(world_chunk_range, chunks, fn(chunks, chunk_z) {
       list.fold(
@@ -199,10 +196,7 @@ pub fn generate(options: WorldGenerationOptions) {
                     relative_chunk_section_range,
                     array,
                     fn(array, relative_y) {
-                      let global_y =
-                        { chunk_section_y - constants.mc_world_chunk_offset }
-                        * 16
-                        + relative_y
+                      let global_y = chunk_section_y * 16 + relative_y
                       let index =
                         relative_y * 256 + relative_z * 16 + relative_x
                       case global_y {
@@ -258,16 +252,18 @@ fn get_empty_chunk_outline(world_chunk_min: Int, world_chunk_max: Int) {
 
   let outline_coordinates =
     list.flatten([
-      list.map(list.range(world_chunk_outline_min, world_chunk_max), fn(x) {
-        #(x, world_chunk_outline_min)
-      }),
-      list.map(list.range(world_chunk_outline_min, world_chunk_max), fn(z) {
+      list.map(
+        list.range(world_chunk_outline_min, world_chunk_outline_max),
+        fn(x) { #(x, world_chunk_outline_min) },
+      ),
+      list.map(list.range(world_chunk_min, world_chunk_max), fn(z) {
         #(world_chunk_outline_max, z)
       }),
-      list.map(list.range(world_chunk_outline_min, world_chunk_max), fn(x) {
-        #(x, world_chunk_outline_max)
-      }),
-      list.map(list.range(world_chunk_outline_min, world_chunk_max), fn(z) {
+      list.map(
+        list.range(world_chunk_outline_min, world_chunk_outline_max),
+        fn(x) { #(x, world_chunk_outline_max) },
+      ),
+      list.map(list.range(world_chunk_min, world_chunk_max), fn(z) {
         #(world_chunk_outline_min, z)
       }),
     ])
