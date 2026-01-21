@@ -14,6 +14,8 @@ import iv
 
 const octaves = [#(1.0, -8.0), #(2.0, 16.0), #(8.0, 2.0)]
 
+const summed_amplitude = 12.0
+
 pub type ChunkGenerationOptions {
   ChunkGenerationOptions(
     seed: Float,
@@ -112,14 +114,21 @@ pub type WorldGenerationOptions {
   )
 }
 
-pub fn generate(options: WorldGenerationOptions) {
-  let world_chunk_half_length = options.chunk_length / 2
-  let world_block_length = options.chunk_length * 16
-  let world_block_half_length = world_block_length / 2
+fn calculate_noise(seed: Float, x: Int, z: Int) {
+  let amplified_value =
+    list.fold(octaves, 0.0, fn(value, octave) {
+      let #(frequency, amplitude) = octave
+      let x = int.to_float(x) /. 128.0
+      let z = int.to_float(z) /. 128.0
+      value +. perlin.noise(x *. frequency, z *. frequency, seed) *. amplitude
+    })
+  { amplified_value /. summed_amplitude +. 1.0 } /. 2.0
+}
 
+pub fn generate(options: WorldGenerationOptions) {
   // The center of a Minecraft world is the intersection of chunk 0,0 & -1,-1
-  let world_chunk_min = world_chunk_half_length * -1
-  let world_chunk_max = world_chunk_half_length - 1
+  let world_chunk_min = options.chunk_length / 2 * -1
+  let world_chunk_max = options.chunk_length / 2 - 1
   let world_chunk_range = list.range(world_chunk_min, world_chunk_max)
   let world_chunk_section_range =
     list.range(
@@ -131,38 +140,6 @@ pub fn generate(options: WorldGenerationOptions) {
   let empty_chunk_section_array =
     iv.initialise(16 * 16 * 16, fn(_) { block_state.Air })
 
-  let summed_amplitude =
-    list.fold(octaves, 0.0, fn(sum, octave) { sum +. pair.second(octave) })
-
-  let global_noise_map =
-    list.fold(
-      octaves,
-      list.range(0, world_block_length * world_block_length - 1)
-        |> list.map(fn(_) { 0.0 }),
-      fn(array, octave) {
-        let #(frequency, amplitude) = octave
-        list.index_map(array, fn(value, index) {
-          let x =
-            int.to_float(index / world_block_length - world_block_half_length)
-            /. 128.0
-          let z =
-            int.to_float(index % world_block_length - world_block_half_length)
-            /. 128.0
-          value
-          +. perlin.noise(x *. frequency, z *. frequency, options.seed)
-          *. amplitude
-        })
-      },
-    )
-    |> list.index_fold(dict.new(), fn(map, value, index) {
-      let global_x = index / world_block_length - world_block_half_length
-      let global_z = index % world_block_length - world_block_half_length
-      dict.insert(
-        map,
-        #(global_x, global_z),
-        { value /. summed_amplitude +. 1.0 } /. 2.0,
-      )
-    })
   list.fold(world_chunk_range, dict.new(), fn(chunks, chunk_x) {
     list.fold(world_chunk_range, chunks, fn(chunks, chunk_z) {
       list.fold(
@@ -180,18 +157,13 @@ pub fn generate(options: WorldGenerationOptions) {
                 fn(array, relative_z) {
                   let global_z = chunk_z * 16 + relative_z
                   let terrain_y =
-                    dict.get(global_noise_map, #(global_x, global_z))
-                    |> result.unwrap(0.0)
-                    |> fn(noise) {
-                      options.min_terrain_height
-                      + float.truncate(
-                        noise
-                        *. int.to_float(
-                          options.max_terrain_height
-                          - options.min_terrain_height,
-                        ),
-                      )
-                    }
+                    options.min_terrain_height
+                    + float.truncate(
+                      calculate_noise(options.seed, global_x, global_z)
+                      *. int.to_float(
+                        options.max_terrain_height - options.min_terrain_height,
+                      ),
+                    )
                   list.fold(
                     relative_chunk_section_range,
                     array,
