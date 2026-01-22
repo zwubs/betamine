@@ -34,6 +34,7 @@ pub type Packet {
   KnownDataPacks(packet: KnownDataPacksPacket)
   Registry(packet: RegistryPacket)
   FinishConfiguration
+  ConfigurationKeepAlive(packet: KeepAlivePacket)
   BundleDelimiter
   Login(packet: LoginPacket)
   ChangeDifficulty(packet: ChangeDifficultyPacket)
@@ -48,7 +49,7 @@ pub type Packet {
   UpdateEntityRotation(packet: UpdateEntityRotationPacket)
   SetHeadRotation(packet: SetHeadRotationPacket)
   RemoveEntities(packet: RemoveEntitiesPacket)
-  PlayKeepAlive(packet: PlayKeepAlivePacket)
+  PlayKeepAlive(packet: KeepAlivePacket)
   SetEntityMetadata(packet: SetEntityMetadataPacket)
   AnimateEntity(packet: AnimateEntityPacket)
   AcknowledgeBlockChange(packet: AcknowledgeBlockChangePacket)
@@ -67,6 +68,7 @@ fn get_packet_id(packet: Packet) -> Int {
     UpdateTags(..) -> 13
     KnownDataPacks(..) -> 14
     FinishConfiguration -> 3
+    ConfigurationKeepAlive(..) -> 4
     BundleDelimiter -> 0
     Login(..) -> 48
     ChangeDifficulty(..) -> 10
@@ -119,7 +121,10 @@ pub fn encode(packet: Packet) -> BytesTree {
     UpdateEntityRotation(packet) -> encode_update_entity_rotation(_, packet)
     SetHeadRotation(packet) -> encode_set_head_rotation(_, packet)
     RemoveEntities(packet) -> encode_remove_entities(_, packet)
-    PlayKeepAlive(packet) -> encode_play_keep_alive(_, packet)
+    PlayKeepAlive(packet) | ConfigurationKeepAlive(packet) -> encode_keep_alive(
+      _,
+      packet,
+    )
     SetEntityMetadata(packet) -> encode_set_entity_metadata(_, packet)
     AnimateEntity(packet) -> encode_animate_entity(_, packet)
     AcknowledgeBlockChange(packet) -> encode_acknowledge_block_change(_, packet)
@@ -660,11 +665,11 @@ fn encode_remove_entities(tree: BytesTree, packet: RemoveEntitiesPacket) {
   encoder.array(tree, packet.entity_ids, encoder.var_int)
 }
 
-pub type PlayKeepAlivePacket {
-  PlayKeepAlivePacket(id: Int)
+pub type KeepAlivePacket {
+  KeepAlivePacket(id: Int)
 }
 
-fn encode_play_keep_alive(tree: BytesTree, packet: PlayKeepAlivePacket) {
+fn encode_keep_alive(tree: BytesTree, packet: KeepAlivePacket) {
   encoder.long(tree, packet.id)
 }
 

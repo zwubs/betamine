@@ -4,7 +4,6 @@ import betamine/protocol/common/chunk
 import betamine/world/generation
 import gleam/dict
 import gleam/erlang/process
-import gleam/int
 import gleam/list
 import gleam/otp/actor
 import gleam/result

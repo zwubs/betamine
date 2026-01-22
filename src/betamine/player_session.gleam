@@ -140,7 +140,13 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
   let state = case state.phase {
     phase.Play if offset >= 15 -> {
       send(state, [
-        clientbound.PlayKeepAlive(clientbound.PlayKeepAlivePacket(0)),
+        clientbound.PlayKeepAlive(clientbound.KeepAlivePacket(0)),
+      ])
+      State(..state, last_keep_alive: now_seconds())
+    }
+    phase.Configuration if offset >= 15 -> {
+      send(state, [
+        clientbound.ConfigurationKeepAlive(clientbound.KeepAlivePacket(0)),
       ])
       State(..state, last_keep_alive: now_seconds())
     }
