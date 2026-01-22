@@ -4,12 +4,15 @@ import betamine/protocol/common/chunk
 import betamine/world/generation
 import gleam/dict
 import gleam/erlang/process
+import gleam/int
+import gleam/list
 import gleam/otp/actor
 import gleam/result
 
 type World {
   World(
-    generation_options: generation.WorldGenerationOptions,
+    world_generation_options: generation.WorldGenerationOptions,
+    chunk_generation_options: generation.ChunkGenerationOptions,
     chunks: dict.Dict(#(Int, Int), chunk.Chunk),
   )
 }
@@ -26,13 +29,20 @@ pub fn start() -> Result(
       min_terrain_height: -16,
       max_terrain_height: 16,
     ),
+    generation.ChunkGenerationOptions(
+      seed: 0.0,
+      chunk_section_count: 24,
+      water_level: 0,
+      min_terrain_height: -16,
+      max_terrain_height: 16,
+    ),
     dict.new(),
   ))
   |> actor.on_message(loop)
   |> actor.start()
   |> result.map(fn(started) {
     let subject = started.data
-    actor.send(subject, message.GenerateWorld)
+    // actor.send(subject, message.GenerateWorld)
     subject
   })
 }
@@ -44,7 +54,18 @@ fn loop(
   case message {
     message.GenerateWorld -> {
       echo "GENERATING CHUNKS"
-      let chunks = generation.generate(world.generation_options)
+      // let chunks = generation.generate(world.world_generation_options)
+      let world_chunk_range = list.range(-5, 4)
+      let chunks =
+        list.fold(world_chunk_range, dict.new(), fn(chunks, x) {
+          list.fold(world_chunk_range, chunks, fn(chunks, z) {
+            dict.insert(
+              chunks,
+              #(x, z),
+              generation.generate_chunk(x, z, world.chunk_generation_options),
+            )
+          })
+        })
       echo "CHUNKS GENERATED"
       actor.continue(World(..world, chunks:))
     }
@@ -59,8 +80,11 @@ fn loop(
           actor.continue(world)
         }
         _ -> {
-          process.send(subject, Error(Nil))
-          actor.continue(world)
+          let chunk =
+            generation.generate_chunk(x, z, world.chunk_generation_options)
+          process.send(subject, Ok(chunk))
+          let chunks = dict.insert(world.chunks, #(x, z), chunk)
+          actor.continue(World(..world, chunks:))
         }
       }
     }

@@ -8,8 +8,6 @@ import gleam/dict
 import gleam/float
 import gleam/int
 import gleam/list
-import gleam/pair
-import gleam/result
 import iv
 
 const octaves = [#(1.0, -8.0), #(2.0, 16.0), #(8.0, 2.0)]
@@ -30,56 +28,32 @@ pub fn generate_chunk(x: Int, z: Int, options: ChunkGenerationOptions) {
   let block_x = x * 16
   let block_z = z * 16
 
-  let world_chunk_section_range = list.range(0, options.chunk_section_count - 1)
+  let world_chunk_section_range =
+    list.range(
+      constants.mc_world_chunk_offset,
+      mc_world_chunk_section_height + constants.mc_world_chunk_offset - 1,
+    )
   let relative_chunk_section_range = list.range(0, 15)
 
   let empty_chunk_section_array =
     iv.initialise(16 * 16 * 16, fn(_) { block_state.Air })
-
-  let summed_amplitude =
-    list.fold(octaves, 0.0, fn(sum, octave) { sum +. pair.second(octave) })
-
-  let noise_map =
-    list.fold(
-      octaves,
-      list.map(list.range(0, 255), fn(_) { 0.0 }),
-      fn(array, octave) {
-        let #(frequency, amplitude) = octave
-        list.index_map(array, fn(value, index) {
-          let x = int.to_float(index / 16 + block_x) /. 64.0
-          let z = int.to_float(index % 16 + block_z) /. 64.0
-          value
-          +. perlin.noise(x *. frequency, z *. frequency, options.seed)
-          *. amplitude
-        })
-      },
-    )
-    |> list.index_fold(dict.new(), fn(map, value, index) {
-      dict.insert(
-        map,
-        #(index / 16, index % 16),
-        { value /. summed_amplitude +. 1.0 } /. 2.0,
-      )
-    })
 
   list.fold(world_chunk_section_range, [], fn(chunk_sections, chunk_section_y) {
     list.fold(
       relative_chunk_section_range,
       empty_chunk_section_array,
       fn(array, relative_x) {
+        let global_x = block_x + relative_x
         list.fold(relative_chunk_section_range, array, fn(array, relative_z) {
+          let global_z = block_z + relative_z
           let terrain_y =
-            dict.get(noise_map, #(relative_x, relative_z))
-            |> result.unwrap(0.0)
-            |> fn(noise) {
-              options.min_terrain_height
-              + float.truncate(
-                noise
-                *. int.to_float(
-                  options.max_terrain_height - options.min_terrain_height,
-                ),
-              )
-            }
+            options.min_terrain_height
+            + float.truncate(
+              calculate_noise(options.seed, global_x, global_z)
+              *. int.to_float(
+                options.max_terrain_height - options.min_terrain_height,
+              ),
+            )
           list.fold(relative_chunk_section_range, array, fn(array, relative_y) {
             let global_y = chunk_section_y * 16 + relative_y
             let index = relative_y * 256 + relative_z * 16 + relative_x

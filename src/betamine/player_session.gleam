@@ -23,6 +23,7 @@ import gleam/function
 import gleam/io
 import gleam/list
 import gleam/otp/actor
+import gleam/result
 import gleam/string
 import glisten
 
@@ -268,18 +269,27 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           state.model_customization,
         ),
       )
-      let chunks = process.call(state.world_subject, 1000, message.GetAllChunks)
+
+      let chunk_range = list.range(-2, 1)
       let chunk_packets =
-        list.map(chunks, fn(pair) {
-          let #(#(x, z), chunk) = pair
-          clientbound.LevelChunkWithLight(
-            clientbound.LevelChunkWithLightPacket(
-              ..clientbound.default_level_chunk_with_light_packet(),
-              x:,
-              z:,
-              chunk:,
-            ),
-          )
+        list.fold(chunk_range, [], fn(packets, x) {
+          list.fold(chunk_range, packets, fn(packets, z) {
+            process.call(state.world_subject, 1000, message.GetChunk(_, x, z))
+            |> result.map(fn(chunk) {
+              [
+                clientbound.LevelChunkWithLight(
+                  clientbound.LevelChunkWithLightPacket(
+                    ..clientbound.default_level_chunk_with_light_packet(),
+                    x:,
+                    z:,
+                    chunk:,
+                  ),
+                ),
+                ..packets
+              ]
+            })
+            |> result.unwrap(packets)
+          })
         })
 
       send(state, [
