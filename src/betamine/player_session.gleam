@@ -276,7 +276,10 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         ),
       )
 
-      let chunk_range = list.range(-2, 1)
+      let chunk_range =
+        list.range({ constants.mc_view_distance * -1 } - 1, {
+          constants.mc_view_distance
+        })
       let chunk_packets =
         list.fold(chunk_range, [], fn(packets, x) {
           list.fold(chunk_range, packets, fn(packets, z) {
