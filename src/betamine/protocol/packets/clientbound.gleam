@@ -10,7 +10,7 @@ import betamine/common/position
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
 import betamine/common/uuid
-import betamine/constants
+import betamine/constant
 import betamine/protocol/common
 import betamine/protocol/common/chunk
 import betamine/protocol/common/entity/entity_metadata
@@ -306,9 +306,9 @@ pub const default_login = LoginPacket(
   entity_id: 0,
   is_hardcore: False,
   dimensions: [#("minecraft", "overworld")],
-  max_player_count: constants.mc_max_player_count,
-  view_distance: constants.mc_view_distance,
-  simulation_distance: constants.mc_simulation_distance,
+  max_player_count: constant.mc_max_player_count,
+  view_distance: constant.mc_view_distance,
+  simulation_distance: constant.mc_simulation_distance,
   reduced_debug_info: False,
   enable_respawn_screen: False,
   do_limited_crafting: False,

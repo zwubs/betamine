@@ -1,4 +1,4 @@
-import betamine/constants.{mc_world_chunk_sections_per_chunk}
+import betamine/constant.{mc_world_chunk_sections_per_chunk}
 import betamine/protocol/common/chunk/chunk_section
 import betamine/protocol/encoder
 import gleam/bytes_tree

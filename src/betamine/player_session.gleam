@@ -7,7 +7,7 @@ import betamine/common/math/vector3
 import betamine/common/profile
 import betamine/common/rotation
 import betamine/common/uuid
-import betamine/constants
+import betamine/constant
 import betamine/handlers/entity_handler
 import betamine/handlers/player_handler
 import betamine/message
@@ -164,13 +164,13 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.StatusRequest -> {
       send(state, [
         clientbound.StatusResponse(clientbound.StatusResponsePacket(
-          version_name: constants.mc_version_name,
-          version_protocol: constants.mc_version_protocol,
-          max_player_count: constants.mc_max_player_count,
+          version_name: constant.mc_version_name,
+          version_protocol: constant.mc_version_protocol,
+          max_player_count: constant.mc_max_player_count,
           online_player_count: 0,
           players: [#("zwubs", "0c3456dc-85a0-4baf-89b4-db008ec1c749")],
           description: "Hello Betamine!",
-          favicon: constants.mc_favicon,
+          favicon: constant.mc_favicon,
           enforces_secure_chat: False,
         )),
       ])
@@ -212,7 +212,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
                 clientbound.KnownDataPack(
                   "minecraft",
                   "core",
-                  constants.mc_version_name,
+                  constant.mc_version_name,
                 ),
               ]),
             ),
@@ -277,8 +277,8 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
 
       let chunk_range =
-        list.range({ constants.mc_view_distance * -1 } - 1, {
-          constants.mc_view_distance
+        list.range({ constant.mc_view_distance * -1 } - 1, {
+          constant.mc_view_distance
         })
       let chunk_packets =
         list.fold(chunk_range, [], fn(packets, x) {
@@ -320,7 +320,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.SetDefaultSpawnPosition(
           clientbound.SetDefaultSpawnPositionPacket(
             dimension: #("minecraft", "overworld"),
-            position: vector3.truncate(constants.mc_player_spawn_point),
+            position: vector3.truncate(constant.mc_player_spawn_point),
             rotation: rotation.Rotation(0.0, 0.0),
           ),
         ),

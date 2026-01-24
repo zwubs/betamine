@@ -7,7 +7,7 @@ import betamine/common/entity/player
 import betamine/common/math/vector3
 import betamine/common/profile
 import betamine/common/uuid
-import betamine/constants
+import betamine/constant
 import betamine/message
 import betamine/mojang
 import gleam/dict
@@ -71,7 +71,7 @@ fn loop(
           ..entity.new(entity_kind.Player),
           id: dict.size(game.entities),
           uuid:,
-          position: constants.mc_player_spawn_point,
+          position: constant.mc_player_spawn_point,
         )
       let player = player.Player(profile:, entity:)
       process.send(player_subject, player)

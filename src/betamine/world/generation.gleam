@@ -1,5 +1,5 @@
 import betamine/common/block/block_state
-import betamine/constants.{mc_world_chunk_sections_per_chunk}
+import betamine/constant.{mc_world_chunk_sections_per_chunk}
 import betamine/perlin
 import betamine/protocol/common/chunk
 import betamine/protocol/common/chunk/chunk_section
@@ -30,8 +30,8 @@ pub fn generate_chunk(x: Int, z: Int, options: ChunkGenerationOptions) {
 
   let world_chunk_section_range =
     list.range(
-      constants.mc_world_chunk_offset,
-      mc_world_chunk_sections_per_chunk + constants.mc_world_chunk_offset - 1,
+      constant.mc_world_chunk_offset,
+      mc_world_chunk_sections_per_chunk + constant.mc_world_chunk_offset - 1,
     )
   let relative_chunk_section_range = list.range(0, 15)
 
@@ -106,8 +106,8 @@ pub fn generate(options: WorldGenerationOptions) {
   let world_chunk_range = list.range(world_chunk_min, world_chunk_max)
   let world_chunk_section_range =
     list.range(
-      constants.mc_world_chunk_offset,
-      mc_world_chunk_sections_per_chunk + constants.mc_world_chunk_offset - 1,
+      constant.mc_world_chunk_offset,
+      mc_world_chunk_sections_per_chunk + constant.mc_world_chunk_offset - 1,
     )
   let relative_chunk_section_range = list.range(0, 15)
 

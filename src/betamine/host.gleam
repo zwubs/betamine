@@ -1,4 +1,4 @@
-import betamine/constants
+import betamine/constant
 import betamine/message
 import betamine/player_session
 import gleam/erlang/process.{type Subject}
@@ -9,7 +9,7 @@ pub fn start(
   game_subject: Subject(message.GameMessage),
   world_subject: Subject(message.WorldMessage),
 ) {
-  start_with_port(game_subject, world_subject, constants.default_host_port)
+  start_with_port(game_subject, world_subject, constant.default_host_port)
 }
 
 pub fn start_with_port(
