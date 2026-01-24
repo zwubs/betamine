@@ -1,7 +1,7 @@
+import betamine/common/block_position
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_pose
 import betamine/common/global_position
-import betamine/common/position
 import betamine/common/slot
 import betamine/common/text_component
 import betamine/common/uuid
@@ -27,8 +27,8 @@ pub type DataType {
   Slot(slot.Slot)
   Boolean(Bool)
   Rotations(x: Float, y: Float, z: Float)
-  Position(position.Position)
-  OptionalPosition(option.Option(position.Position))
+  BlockPosition(block_position.BlockPosition)
+  OptionalPosition(option.Option(block_position.BlockPosition))
   Direction(direction.Direction)
   OptionalLivingEntityReference(option.Option(uuid.Uuid))
   BlockState
@@ -69,7 +69,7 @@ pub fn to_type_int(data_type: DataType) {
     Slot(..) -> 7
     Boolean(..) -> 8
     Rotations(..) -> 9
-    Position(..) -> 10
+    BlockPosition(..) -> 10
     OptionalPosition(..) -> 11
     Direction(..) -> 12
     OptionalLivingEntityReference(..) -> 13
@@ -120,7 +120,10 @@ fn encode_data_type(bytes_tree: bytes_tree.BytesTree, data_type: DataType) {
     String(string) -> encoder.string(_, string)
     Boolean(bool) -> encoder.bool(_, bool)
     Rotations(x, y, z) -> list.fold([x, y, z], _, encoder.float)
-    Position(position) -> encoder.raw(_, position.to_bit_array(position))
+    BlockPosition(position) -> encoder.raw(
+      _,
+      block_position.to_bit_array(position),
+    )
     OptionalPosition(optional_position) -> encoder.optional(
       _,
       optional_position,

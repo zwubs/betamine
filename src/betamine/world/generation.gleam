@@ -1,4 +1,5 @@
 import betamine/common/block/block_state
+import betamine/common/chunk_position
 import betamine/constant.{mc_world_chunk_sections_per_chunk}
 import betamine/perlin
 import betamine/protocol/common/chunk
@@ -24,9 +25,12 @@ pub type ChunkGenerationOptions {
   )
 }
 
-pub fn generate_chunk(x: Int, z: Int, options: ChunkGenerationOptions) {
-  let block_x = x * 16
-  let block_z = z * 16
+pub fn generate_chunk(
+  position: chunk_position.ChunkPosition,
+  options: ChunkGenerationOptions,
+) {
+  let block_x = position.x * 16
+  let block_z = position.z * 16
 
   let world_chunk_section_range =
     list.range(

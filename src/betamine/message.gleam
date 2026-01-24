@@ -1,4 +1,6 @@
 import betamine/common/block/block_state
+import betamine/common/block_position
+import betamine/common/chunk_position
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_metadata
@@ -58,19 +60,20 @@ pub type GameMessage {
 
 pub type WorldMessage {
   GenerateWorld
-  GetAllChunks(subject: process.Subject(List(#(#(Int, Int), chunk.Chunk))))
-  GetChunk(subject: process.Subject(Result(chunk.Chunk, Nil)), x: Int, z: Int)
+  GetAllChunks(
+    subject: process.Subject(List(#(chunk_position.ChunkPosition, chunk.Chunk))),
+  )
+  GetChunk(
+    subject: process.Subject(Result(chunk.Chunk, Nil)),
+    chunk_position: chunk_position.ChunkPosition,
+  )
   GetBlock(
     subject: process.Subject(Result(block_state.BlockState, Nil)),
-    x: Int,
-    y: Int,
-    z: Int,
+    block_position: block_position.BlockPosition,
   )
   PlaceBlock(
     subject: process.Subject(Result(block_state.BlockState, Nil)),
-    x: Int,
-    y: Int,
-    z: Int,
+    block_position: block_position.BlockPosition,
     state: block_state.BlockState,
   )
 }

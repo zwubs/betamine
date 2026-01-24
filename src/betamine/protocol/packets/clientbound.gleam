@@ -1,4 +1,5 @@
 import betamine/common/block/block_state
+import betamine/common/block_position
 import betamine/common/chat/chat_session
 import betamine/common/difficulty.{type Difficulty}
 import betamine/common/entity/entity_animation
@@ -6,7 +7,6 @@ import betamine/common/entity/entity_kind
 import betamine/common/entity/player/player_game_mode
 import betamine/common/identifier
 import betamine/common/math/vector3.{type Vector3}
-import betamine/common/position
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
 import betamine/common/uuid
@@ -714,7 +714,7 @@ pub fn encode_acknowledge_block_change(
 
 pub type BlockUpdatePacket {
   BlockUpdatePacket(
-    position: position.Position,
+    position: block_position.BlockPosition,
     block_state: block_state.BlockState,
   )
 }
@@ -728,7 +728,7 @@ pub fn encode_block_update(tree: BytesTree, packet: BlockUpdatePacket) {
 pub type SetDefaultSpawnPositionPacket {
   SetDefaultSpawnPositionPacket(
     dimension: identifier.Identifier,
-    position: position.Position,
+    position: block_position.BlockPosition,
     rotation: rotation.Rotation,
   )
 }

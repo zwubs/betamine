@@ -1,4 +1,6 @@
 import betamine/common/block/block_state
+import betamine/common/block_position
+import betamine/common/chunk_position
 import betamine/message
 import betamine/protocol/common/chunk
 import betamine/world/generation
@@ -12,7 +14,7 @@ type World {
   World(
     world_generation_options: generation.WorldGenerationOptions,
     chunk_generation_options: generation.ChunkGenerationOptions,
-    chunks: dict.Dict(#(Int, Int), chunk.Chunk),
+    chunks: dict.Dict(chunk_position.ChunkPosition, chunk.Chunk),
   )
 }
 
@@ -58,10 +60,14 @@ fn loop(
       let chunks =
         list.fold(world_chunk_range, dict.new(), fn(chunks, x) {
           list.fold(world_chunk_range, chunks, fn(chunks, z) {
+            let position = chunk_position.new(x, z)
             dict.insert(
               chunks,
-              #(x, z),
-              generation.generate_chunk(x, z, world.chunk_generation_options),
+              position,
+              generation.generate_chunk(
+                position,
+                world.chunk_generation_options,
+              ),
             )
           })
         })
@@ -72,31 +78,33 @@ fn loop(
       process.send(subject, dict.to_list(world.chunks))
       actor.continue(world)
     }
-    message.GetChunk(subject:, x:, z:) -> {
-      case dict.get(world.chunks, #(x, z)) {
+    message.GetChunk(subject:, chunk_position:) -> {
+      case dict.get(world.chunks, chunk_position) {
         Ok(chunk) -> {
           process.send(subject, Ok(chunk))
           actor.continue(world)
         }
         _ -> {
           let chunk =
-            generation.generate_chunk(x, z, world.chunk_generation_options)
+            generation.generate_chunk(
+              chunk_position,
+              world.chunk_generation_options,
+            )
           process.send(subject, Ok(chunk))
-          let chunks = dict.insert(world.chunks, #(x, z), chunk)
+          let chunks = dict.insert(world.chunks, chunk_position, chunk)
           actor.continue(World(..world, chunks:))
         }
       }
     }
-    message.GetBlock(subject:, x:, y:, z:) -> {
-      let chunk_x = x / 16
-      let chunk_z = z / 16
-      case dict.get(world.chunks, #(chunk_x, chunk_z)) {
+    message.GetBlock(subject:, block_position:) -> {
+      let chunk_position = chunk_position.from_block_position(block_position)
+      case dict.get(world.chunks, chunk_position) {
         Ok(_) -> Ok(block_state.air)
         _ -> Error(Nil)
       }
       |> process.send(subject, _)
       actor.continue(world)
     }
-    message.PlaceBlock(subject:, x:, y:, z:, state:) -> todo
+    message.PlaceBlock(subject:, block_position:, state:) -> todo
   }
 }

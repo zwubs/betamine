@@ -1,6 +1,6 @@
+import betamine/common/block_position.{type BlockPosition}
 import betamine/common/identifier.{type Identifier}
-import betamine/common/position.{type Position}
 
 pub type GlobalPosition {
-  GlobalPosition(identifier: Identifier, position: Position)
+  GlobalPosition(identifier: Identifier, position: BlockPosition)
 }

@@ -1,3 +1,4 @@
+import betamine/common/chunk_position
 import betamine/common/difficulty
 import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
@@ -285,7 +286,10 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       let chunk_packets =
         list.fold(chunk_range, [], fn(packets, x) {
           list.fold(chunk_range, packets, fn(packets, z) {
-            process.call(state.world_subject, 1000, message.GetChunk(_, x, z))
+            process.call(state.world_subject, 1000, message.GetChunk(
+              _,
+              chunk_position.ChunkPosition(x, z),
+            ))
             |> result.map(fn(chunk) {
               [
                 clientbound.LevelChunkWithLight(

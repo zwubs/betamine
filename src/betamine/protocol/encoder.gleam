@@ -1,7 +1,7 @@
 import betamine/common/block/block_state
+import betamine/common/block_position
 import betamine/common/identifier
 import betamine/common/math/vector3.{type Vector3}
-import betamine/common/position
 import gleam/bit_array
 import gleam/bytes_tree.{type BytesTree}
 import gleam/float
@@ -71,7 +71,7 @@ pub fn double(tree: BytesTree, float: Float) -> BytesTree {
 }
 
 pub fn position(tree: BytesTree, position: Vector3(Int)) -> BytesTree {
-  bytes_tree.append(tree, position.to_bit_array(position))
+  bytes_tree.append(tree, block_position.to_bit_array(position))
 }
 
 pub fn angle(tree: BytesTree, angle: Float) -> BytesTree {
