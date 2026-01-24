@@ -17,12 +17,14 @@ import betamine/protocol/common/entity/entity_metadata
 import betamine/protocol/common/game_event
 import betamine/protocol/encoder
 import gleam/bytes_tree.{type BytesTree}
+import gleam/float
 import gleam/function
 import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
 import gleam/set
+import nbeet
 
 pub type Packet {
   StatusResponse(packet: StatusResponsePacket)
@@ -55,6 +57,7 @@ pub type Packet {
   AcknowledgeBlockChange(packet: AcknowledgeBlockChangePacket)
   BlockUpdate(packet: BlockUpdatePacket)
   SetDefaultSpawnPosition(packet: SetDefaultSpawnPositionPacket)
+  SystemChat(packet: SystemChatPacket)
 }
 
 fn get_packet_id(packet: Packet) -> Int {
@@ -89,6 +92,7 @@ fn get_packet_id(packet: Packet) -> Int {
     AcknowledgeBlockChange(..) -> 4
     BlockUpdate(..) -> 8
     SetDefaultSpawnPosition(..) -> 95
+    SystemChat(..) -> 119
   }
 }
 
@@ -133,6 +137,7 @@ pub fn encode(packet: Packet) -> BytesTree {
       _,
       packet,
     )
+    SystemChat(packet) -> encode_system_chat(_, packet)
   }
 }
 
@@ -356,7 +361,7 @@ pub type DeathLocation {
 fn encode_death_location(tree: BytesTree, death_location: DeathLocation) {
   tree
   |> common.encode_identifier(death_location.dimension)
-  |> encoder.position(death_location.position |> vector3.truncate)
+  |> encoder.position(death_location.position |> vector3.map(float.truncate))
 }
 
 pub type ChangeDifficultyPacket {
@@ -737,4 +742,16 @@ pub fn encode_set_default_spawn_position(
   |> encoder.position(packet.position)
   |> encoder.float(packet.rotation.yaw)
   |> encoder.float(packet.rotation.pitch)
+}
+
+pub type SystemChatPacket {
+  SystemChatPacket(content: String, overlay: Bool)
+}
+
+pub fn encode_system_chat(tree: BytesTree, packet: SystemChatPacket) {
+  let assert Ok(nbt) =
+    nbeet.java_network_encode(
+      nbeet.root([#("text", nbeet.string(packet.content))]),
+    )
+  tree |> encoder.raw(nbt) |> encoder.bool(packet.overlay)
 }

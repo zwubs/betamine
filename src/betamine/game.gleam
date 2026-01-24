@@ -12,6 +12,7 @@ import betamine/message
 import betamine/mojang
 import gleam/dict
 import gleam/erlang/process.{type Subject}
+import gleam/float
 import gleam/list
 import gleam/otp/actor
 import gleam/result
@@ -93,7 +94,7 @@ fn loop(
                 game,
                 message.EntityPositionUpdated(
                   entity.id,
-                  vector3.subtract(new_position, entity.position),
+                  vector3.map2(new_position, entity.position, float.subtract),
                   on_ground,
                 ),
               )

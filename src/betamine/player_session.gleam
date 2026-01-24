@@ -19,7 +19,9 @@ import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import betamine/protocol/registry
 import gleam/erlang/process.{type Subject}
+import gleam/float
 import gleam/function
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/otp/actor
@@ -320,7 +322,10 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.SetDefaultSpawnPosition(
           clientbound.SetDefaultSpawnPositionPacket(
             dimension: #("minecraft", "overworld"),
-            position: vector3.truncate(constant.mc_player_spawn_point),
+            position: vector3.map(
+              constant.mc_player_spawn_point,
+              float.truncate,
+            ),
             rotation: rotation.Rotation(0.0, 0.0),
           ),
         ),
@@ -341,9 +346,22 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       Ok(State(..state, ignore_position_packets: False))
     }
     serverbound.PlayerPosition(packet) -> {
+      let chunk_position =
+        vector3.map(packet.position, fn(f) { float.truncate(float.floor(f)) })
+        |> vector3.map(int.bitwise_shift_right(_, 4))
       case state.ignore_position_packets {
         True -> Nil
         False -> {
+          send(state, [
+            clientbound.SystemChat(clientbound.SystemChatPacket(
+              "("
+                <> int.to_string(chunk_position.x)
+                <> ","
+                <> int.to_string(chunk_position.z)
+                <> ")",
+              True,
+            )),
+          ])
           process.send(
             state.game_subject,
             message.MovePlayer(state.uuid, packet.position, packet.on_ground),
