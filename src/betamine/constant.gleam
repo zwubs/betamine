@@ -20,7 +20,7 @@ pub const mc_favicon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACA
 
 pub const mc_view_distance = 4
 
-pub const mc_player_game_mode = player_game_mode.Creative
+pub const mc_player_game_mode = player_game_mode.Survival
 
 pub const mc_simulation_distance = 2
 

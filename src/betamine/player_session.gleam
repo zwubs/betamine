@@ -542,14 +542,7 @@ fn handle_player_move(
 
   send(state, [
     clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(to_chunk)),
-    clientbound.SystemChat(clientbound.SystemChatPacket(
-      "("
-        <> int.to_string(to_chunk.x)
-        <> ","
-        <> int.to_string(to_chunk.z)
-        <> ")",
-      True,
-    )),
+    // clientbound.SystemChat(clientbound.SystemChatPacket("(" <> int.to_string(to_chunk.x) <> "," <> int.to_string(to_chunk.z) <> ")", True)),
   ])
   Ok(State(..state, position:, loaded_chunks: chunk_positions))
 }
