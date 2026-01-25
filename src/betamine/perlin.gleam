@@ -2,7 +2,7 @@ import gleam/float
 import gleam/int
 
 fn get_permutation(index: Int) {
-  case index {
+  case int.bitwise_and(index, 255) {
     000 -> 151
     001 -> 160
     002 -> 137
@@ -259,7 +259,7 @@ fn get_permutation(index: Int) {
     253 -> 061
     254 -> 156
     255 -> 180
-    _ -> get_permutation(index - 256)
+    _ -> 0
   }
 }
 
@@ -286,17 +286,17 @@ fn grad(hash: Int, x: Float, y: Float, z: Float) {
     0xA -> y -. z
     0xB -> -1.0 *. y -. z
     0xC -> y +. x
-    0xD -> -1.0 *. y +. z
+    0xD -> -1.0 *. y +. x
     0xE -> y -. x
-    0xF -> -1.0 *. y -. z
+    0xF -> -1.0 *. y -. x
     _ -> 0.0
   }
 }
 
 pub fn noise(x: Float, y: Float, z: Float) {
-  let xi = float.truncate(x) |> int.clamp(0, 255)
-  let yi = float.truncate(y) |> int.clamp(0, 255)
-  let zi = float.truncate(z) |> int.clamp(0, 255)
+  let xi = float.truncate(float.floor(x)) |> int.bitwise_and(255)
+  let yi = float.truncate(float.floor(y)) |> int.bitwise_and(255)
+  let zi = float.truncate(float.floor(z)) |> int.bitwise_and(255)
 
   let xf = x -. float.floor(x)
   let yf = y -. float.floor(y)

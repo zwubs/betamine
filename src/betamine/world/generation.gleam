@@ -29,6 +29,11 @@ pub fn generate_chunk(
   position: chunk_position.ChunkPosition,
   options: ChunkGenerationOptions,
 ) {
+  echo "GENERATING CHUNK ("
+    <> int.to_string(position.x)
+    <> ","
+    <> int.to_string(position.z)
+    <> ")"
   let block_x = position.x * 16
   let block_z = position.z * 16
 
@@ -96,9 +101,9 @@ fn calculate_noise(seed: Float, x: Int, z: Int) {
   let amplified_value =
     list.fold(octaves, 0.0, fn(value, octave) {
       let #(frequency, amplitude) = octave
-      let x = int.to_float(x) /. 128.0
-      let z = int.to_float(z) /. 128.0
-      value +. perlin.noise(x *. frequency, z *. frequency, seed) *. amplitude
+      let x = int.to_float(x) /. 128.0 *. frequency
+      let z = int.to_float(z) /. 128.0 *. frequency
+      value +. perlin.noise(x, seed, z) *. amplitude
     })
   { amplified_value /. summed_amplitude +. 1.0 } /. 2.0
 }

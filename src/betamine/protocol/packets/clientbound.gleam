@@ -1,6 +1,7 @@
 import betamine/common/block/block_state
 import betamine/common/block_position
 import betamine/common/chat/chat_session
+import betamine/common/chunk_position
 import betamine/common/difficulty.{type Difficulty}
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
@@ -40,6 +41,7 @@ pub type Packet {
   BundleDelimiter
   Login(packet: LoginPacket)
   ChangeDifficulty(packet: ChangeDifficultyPacket)
+  ForgetLevelChunk(packet: ForgetLevelChunkPacket)
   GameEvent(packet: GameEventPacket)
   SetCenterChunk(packet: SetCenterChunkPacket)
   LevelChunkWithLight(packet: LevelChunkWithLightPacket)
@@ -75,6 +77,7 @@ fn get_packet_id(packet: Packet) -> Int {
     BundleDelimiter -> 0
     Login(..) -> 48
     ChangeDifficulty(..) -> 10
+    ForgetLevelChunk(..) -> 37
     GameEvent(..) -> 38
     SetCenterChunk(..) -> 92
     LevelChunkWithLight(..) -> 44
@@ -111,6 +114,7 @@ pub fn encode(packet: Packet) -> BytesTree {
     BundleDelimiter -> function.identity
     Login(packet) -> encode_login(_, packet)
     ChangeDifficulty(packet) -> encode_change_difficulty(_, packet)
+    ForgetLevelChunk(packet) -> encode_forget_level_chunk(_, packet)
     GameEvent(packet) -> encode_game_event(_, packet)
     SetCenterChunk(packet) -> encode_set_center_chunk(_, packet)
     LevelChunkWithLight(packet) -> encode_level_chunk_with_light(_, packet)
@@ -312,7 +316,7 @@ pub const default_login = LoginPacket(
   is_hardcore: False,
   dimensions: [#("minecraft", "overworld")],
   max_player_count: constant.mc_max_player_count,
-  view_distance: constant.mc_view_distance,
+  view_distance: 10,
   simulation_distance: constant.mc_simulation_distance,
   reduced_debug_info: False,
   enable_respawn_screen: False,
@@ -374,6 +378,16 @@ fn encode_change_difficulty(tree: BytesTree, packet: ChangeDifficultyPacket) {
   |> encoder.bool(packet.locked)
 }
 
+pub type ForgetLevelChunkPacket {
+  ForgetLevelChunkPacket(position: chunk_position.ChunkPosition)
+}
+
+fn encode_forget_level_chunk(tree: BytesTree, packet: ForgetLevelChunkPacket) {
+  tree
+  |> encoder.int(packet.position.z)
+  |> encoder.int(packet.position.x)
+}
+
 pub type GameEventPacket {
   GameEventPacket(game_event: game_event.GameEvent)
 }
@@ -394,8 +408,7 @@ fn encode_set_center_chunk(tree: BytesTree, packet: SetCenterChunkPacket) {
 
 pub type LevelChunkWithLightPacket {
   LevelChunkWithLightPacket(
-    x: Int,
-    z: Int,
+    position: chunk_position.ChunkPosition,
     heightmaps: List(Nil),
     chunk: chunk.Chunk,
     block_entities: List(Nil),
@@ -412,8 +425,7 @@ pub fn default_level_chunk_with_light_packet() {
   let sky_light_array = list.range(1, 2048) |> list.map(fn(_) { 0xFF })
   let block_light_array = sky_light_array |> list.map(fn(_) { 0x0 })
   LevelChunkWithLightPacket(
-    x: 0,
-    z: 0,
+    position: chunk_position.default,
     heightmaps: [],
     chunk: chunk.default(),
     block_entities: [],
@@ -436,8 +448,8 @@ fn encode_level_chunk_with_light(
   packet: LevelChunkWithLightPacket,
 ) {
   tree
-  |> encoder.int(packet.x)
-  |> encoder.int(packet.z)
+  |> encoder.int(packet.position.x)
+  |> encoder.int(packet.position.z)
   |> encoder.array(packet.heightmaps, fn(_, _) { todo as "Encode heightmaps" })
   |> chunk.encode(packet.chunk)
   |> encoder.array(packet.block_entities, fn(_, _) {

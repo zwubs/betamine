@@ -56,7 +56,7 @@ fn loop(
     message.GenerateWorld -> {
       echo "GENERATING CHUNKS"
       // let chunks = generation.generate(world.world_generation_options)
-      let world_chunk_range = list.range(-5, 4)
+      let world_chunk_range = list.range(-8, 7)
       let chunks =
         list.fold(world_chunk_range, dict.new(), fn(chunks, x) {
           list.fold(world_chunk_range, chunks, fn(chunks, z) {
@@ -81,7 +81,7 @@ fn loop(
     message.GetChunk(subject:, chunk_position:) -> {
       case dict.get(world.chunks, chunk_position) {
         Ok(chunk) -> {
-          process.send(subject, Ok(chunk))
+          process.send(subject, chunk)
           actor.continue(world)
         }
         _ -> {
@@ -90,7 +90,7 @@ fn loop(
               chunk_position,
               world.chunk_generation_options,
             )
-          process.send(subject, Ok(chunk))
+          process.send(subject, chunk)
           let chunks = dict.insert(world.chunks, chunk_position, chunk)
           actor.continue(World(..world, chunks:))
         }

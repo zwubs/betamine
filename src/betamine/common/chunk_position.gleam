@@ -11,6 +11,8 @@ pub fn new(x: Int, z: Int) {
   ChunkPosition(x, z)
 }
 
+pub const default = ChunkPosition(0, 0)
+
 pub fn from_position(position: position.Position) {
   block_position.from_position(position)
   |> from_block_position()
