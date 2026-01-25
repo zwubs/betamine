@@ -287,29 +287,33 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
 
       let chunk_range =
-        list.range({ constant.mc_view_distance * -1 } - 1, {
-          constant.mc_view_distance
+        list.range({ constant.mc_view_distance + 1 } * -1, {
+          constant.mc_view_distance + 1
         })
-      let chunk_packets =
-        list.fold(chunk_range, [], fn(packets, x) {
-          list.fold(chunk_range, packets, fn(packets, z) {
-            let position = chunk_position.ChunkPosition(x, z)
-            let chunk =
-              process.call(state.world_subject, 1000, message.GetChunk(
-                _,
-                position,
-              ))
-            [
-              clientbound.LevelChunkWithLight(
-                clientbound.LevelChunkWithLightPacket(
-                  ..clientbound.default_level_chunk_with_light_packet(),
-                  position:,
-                  chunk:,
-                ),
-              ),
-              ..packets
-            ]
+      let chunk_positions =
+        list.fold(chunk_range, set.new(), fn(positions, x) {
+          list.fold(chunk_range, positions, fn(positions, z) {
+            set.insert(positions, chunk_position.new(x, z))
           })
+        })
+
+      let chunk_packets =
+        set.fold(chunk_positions, [], fn(packets, position) {
+          let chunk =
+            process.call(state.world_subject, 1000, message.GetChunk(
+              _,
+              position,
+            ))
+          [
+            clientbound.LevelChunkWithLight(
+              clientbound.LevelChunkWithLightPacket(
+                ..clientbound.default_level_chunk_with_light_packet(),
+                position:,
+                chunk:,
+              ),
+            ),
+            ..packets
+          ]
         })
 
       send(state, [
@@ -327,7 +331,9 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.GameEvent(clientbound.GameEventPacket(
           game_event: game_event.WaitForChunks,
         )),
-        clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
+        clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(
+          chunk_position.default,
+        )),
         clientbound.SetDefaultSpawnPosition(
           clientbound.SetDefaultSpawnPositionPacket(
             dimension: #("minecraft", "overworld"),
@@ -349,7 +355,14 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         ),
         ..chunk_packets
       ])
-      Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
+      Ok(
+        State(
+          ..state,
+          phase: phase.Play,
+          ignore_position_packets: True,
+          loaded_chunks: chunk_positions,
+        ),
+      )
     }
     serverbound.ConfirmTeleport(_) -> {
       Ok(State(..state, ignore_position_packets: False))
@@ -479,22 +492,20 @@ fn handle_player_move(
   let from_chunk = chunk_position.from_position(state.position)
   let to_chunk = chunk_position.from_position(position)
   use <- bool.guard(from_chunk == to_chunk, Ok(State(..state, position:)))
-  let chunk_x_range =
-    list.range(
-      { constant.mc_view_distance + 1 } * -1 + to_chunk.x,
-      { constant.mc_view_distance + 1 } + to_chunk.x,
-    )
-  let chunk_z_range =
-    list.range(
-      { constant.mc_view_distance + 1 } * -1 + to_chunk.z,
-      { constant.mc_view_distance + 1 } + to_chunk.z,
-    )
+  let chunk_range =
+    list.range({ constant.mc_view_distance + 1 } * -1, {
+      constant.mc_view_distance + 1
+    })
   let chunk_positions =
-    list.fold(chunk_x_range, set.new(), fn(positions, x) {
-      list.fold(chunk_z_range, positions, fn(positions, z) {
-        set.insert(positions, chunk_position.new(x, z))
+    list.fold(chunk_range, set.new(), fn(positions, x) {
+      list.fold(chunk_range, positions, fn(positions, z) {
+        set.insert(
+          positions,
+          chunk_position.new(x + to_chunk.x, z + to_chunk.z),
+        )
       })
     })
+
   let chunk_positions_to_load =
     set.difference(chunk_positions, state.loaded_chunks)
   let chunk_load_packets =
@@ -516,6 +527,7 @@ fn handle_player_move(
       ]
     })
   send(state, chunk_load_packets)
+
   let chunk_positions_to_unload =
     set.difference(state.loaded_chunks, chunk_positions)
   let chunk_unload_packets =
@@ -528,7 +540,9 @@ fn handle_player_move(
       ]
     })
   send(state, chunk_unload_packets)
+
   send(state, [
+    clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(to_chunk)),
     clientbound.SystemChat(clientbound.SystemChatPacket(
       "("
         <> int.to_string(to_chunk.x)
@@ -538,5 +552,5 @@ fn handle_player_move(
       True,
     )),
   ])
-  Ok(State(..state, position:))
+  Ok(State(..state, position:, loaded_chunks: chunk_positions))
 }

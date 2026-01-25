@@ -300,8 +300,8 @@ pub type LoginPacket {
     dimension_id: Int,
     dimension_name: identifier.Identifier,
     hashed_seed: Int,
-    game_mode: Int,
-    previous_game_mode: Int,
+    game_mode: player_game_mode.PlayerGameMode,
+    previous_game_mode: option.Option(player_game_mode.PlayerGameMode),
     is_debug: Bool,
     is_flat: Bool,
     death_location: Option(DeathLocation),
@@ -316,7 +316,7 @@ pub const default_login = LoginPacket(
   is_hardcore: False,
   dimensions: [#("minecraft", "overworld")],
   max_player_count: constant.mc_max_player_count,
-  view_distance: 10,
+  view_distance: constant.mc_view_distance,
   simulation_distance: constant.mc_simulation_distance,
   reduced_debug_info: False,
   enable_respawn_screen: False,
@@ -324,8 +324,8 @@ pub const default_login = LoginPacket(
   dimension_id: 0,
   dimension_name: #("minecraft", "overworld"),
   hashed_seed: 0,
-  game_mode: 0,
-  previous_game_mode: -1,
+  game_mode: constant.mc_player_game_mode,
+  previous_game_mode: option.None,
   is_debug: False,
   is_flat: False,
   death_location: None,
@@ -348,8 +348,11 @@ pub fn encode_login(tree: BytesTree, packet: LoginPacket) {
   |> encoder.var_int(packet.dimension_id)
   |> common.encode_identifier(packet.dimension_name)
   |> encoder.long(packet.hashed_seed)
-  |> encoder.byte(packet.game_mode)
-  |> encoder.byte(packet.previous_game_mode)
+  |> encoder.byte(player_game_mode.to_int(packet.game_mode))
+  |> encoder.byte(
+    option.map(packet.previous_game_mode, player_game_mode.to_int)
+    |> option.unwrap(-1),
+  )
   |> encoder.bool(packet.is_debug)
   |> encoder.bool(packet.is_flat)
   |> encoder.optional(packet.death_location, encode_death_location)
@@ -397,13 +400,13 @@ fn encode_game_event(tree: BytesTree, packet: GameEventPacket) {
 }
 
 pub type SetCenterChunkPacket {
-  SetCenterChunkPacket(x: Int, y: Int)
+  SetCenterChunkPacket(position: chunk_position.ChunkPosition)
 }
 
 fn encode_set_center_chunk(tree: BytesTree, packet: SetCenterChunkPacket) {
   tree
-  |> encoder.var_int(packet.x)
-  |> encoder.var_int(packet.y)
+  |> encoder.var_int(packet.position.x)
+  |> encoder.var_int(packet.position.z)
 }
 
 pub type LevelChunkWithLightPacket {

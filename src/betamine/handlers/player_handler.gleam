@@ -1,7 +1,7 @@
 import betamine/common/entity/player
-import betamine/common/entity/player/player_game_mode
 import betamine/common/profile
 import betamine/common/uuid
+import betamine/constant
 import betamine/handlers/entity_handler
 import betamine/protocol/packets/clientbound.{type Packet}
 import gleam/option
@@ -22,7 +22,7 @@ pub fn handle_add(profile: profile.Profile) -> Packet {
           latency: 0,
           visible_on_player_list: True,
           profile: profile,
-          game_mode: player_game_mode.Survival,
+          game_mode: constant.mc_player_game_mode,
           chat_session: option.None,
           display_name: option.Some(profile.name),
           hat_visible: True,
