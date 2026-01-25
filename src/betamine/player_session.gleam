@@ -28,7 +28,6 @@ import gleam/int
 import gleam/io
 import gleam/list
 import gleam/otp/actor
-import gleam/result
 import gleam/set
 import gleam/string
 import glisten

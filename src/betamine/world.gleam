@@ -1,6 +1,6 @@
 import betamine/common/block/block_state
-import betamine/common/block_position
 import betamine/common/chunk_position
+import betamine/constant
 import betamine/message
 import betamine/protocol/common/chunk
 import betamine/world/generation
@@ -9,6 +9,7 @@ import gleam/erlang/process
 import gleam/list
 import gleam/otp/actor
 import gleam/result
+import gleam/set
 
 type World {
   World(
@@ -43,7 +44,7 @@ pub fn start() -> Result(
   |> actor.start()
   |> result.map(fn(started) {
     let subject = started.data
-    // actor.send(subject, message.GenerateWorld)
+    actor.send(subject, message.GenerateSpawnChunks)
     subject
   })
 }
@@ -53,25 +54,23 @@ fn loop(
   message: message.WorldMessage,
 ) -> actor.Next(World, message.WorldMessage) {
   case message {
-    message.GenerateWorld -> {
-      echo "GENERATING CHUNKS"
-      // let chunks = generation.generate(world.world_generation_options)
-      let world_chunk_range = list.range(-8, 7)
-      let chunks =
-        list.fold(world_chunk_range, dict.new(), fn(chunks, x) {
-          list.fold(world_chunk_range, chunks, fn(chunks, z) {
-            let position = chunk_position.new(x, z)
-            dict.insert(
-              chunks,
-              position,
-              generation.generate_chunk(
-                position,
-                world.chunk_generation_options,
-              ),
-            )
+    message.GenerateSpawnChunks -> {
+      let chunk_range =
+        list.range({ constant.mc_view_distance + 1 } * -1, {
+          constant.mc_view_distance + 1
+        })
+      let chunk_positions =
+        list.fold(chunk_range, set.new(), fn(positions, x) {
+          list.fold(chunk_range, positions, fn(positions, z) {
+            set.insert(positions, chunk_position.new(x, z))
           })
         })
-      echo "CHUNKS GENERATED"
+      let chunks =
+        set.fold(chunk_positions, world.chunks, fn(chunks, position) {
+          let chunk =
+            generation.generate_chunk(position, world.chunk_generation_options)
+          dict.insert(chunks, position, chunk)
+        })
       actor.continue(World(..world, chunks:))
     }
     message.GetAllChunks(subject:) -> {

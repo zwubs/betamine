@@ -59,7 +59,7 @@ pub type GameMessage {
 }
 
 pub type WorldMessage {
-  GenerateWorld
+  GenerateSpawnChunks
   GetAllChunks(
     subject: process.Subject(List(#(chunk_position.ChunkPosition, chunk.Chunk))),
   )
