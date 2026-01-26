@@ -24,7 +24,7 @@ pub const mc_player_game_mode = player_game_mode.Survival
 
 pub const mc_simulation_distance = 2
 
-pub const mc_player_spawn_point = Vector3(0.0, 16.0, 0.0)
+pub const mc_player_spawn_point = Vector3(0.0, 96.0, 0.0)
 
 pub const mc_world_chunk_sections_per_chunk = 24
 

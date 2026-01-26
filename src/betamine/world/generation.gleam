@@ -15,8 +15,8 @@ const octaves = [#(1.0, -8.0), #(2.0, 16.0), #(8.0, 2.0)]
 
 const summed_amplitude = 12.0
 
-pub type ChunkGenerationOptions {
-  ChunkGenerationOptions(
+pub type GenerationOptions {
+  GenerationOptions(
     seed: Float,
     water_level: Int,
     chunk_section_count: Int,
@@ -27,7 +27,7 @@ pub type ChunkGenerationOptions {
 
 pub fn generate_chunk(
   position: chunk_position.ChunkPosition,
-  options: ChunkGenerationOptions,
+  options: GenerationOptions,
 ) {
   let world_chunk_section_range =
     list.range(
@@ -54,7 +54,7 @@ pub fn generate_chunk(
 
 pub fn generate_chunk_section(
   position: chunk_section_position.ChunkSectionPosition,
-  options: ChunkGenerationOptions,
+  options: GenerationOptions,
 ) -> chunk_section.ChunkSection {
   let relative_chunk_section_range = list.range(0, 15)
 
@@ -107,16 +107,6 @@ pub fn generate_chunk_section(
       data: iv.map(data, block_state.to_int) |> iv.to_list,
       palette: chunk_section.direct_block_palette(),
     ),
-  )
-}
-
-pub type WorldGenerationOptions {
-  WorldGenerationOptions(
-    seed: Float,
-    water_level: Int,
-    chunk_length: Int,
-    max_terrain_height: Int,
-    min_terrain_height: Int,
   )
 }
 
