@@ -1,13 +1,15 @@
+import betamine/common/chunk_position
 import betamine/common/difficulty
 import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/player/player_interaction
 import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3
+import betamine/common/position
 import betamine/common/profile
 import betamine/common/rotation
 import betamine/common/uuid
-import betamine/constants
+import betamine/constant
 import betamine/handlers/entity_handler
 import betamine/handlers/player_handler
 import betamine/message
@@ -18,12 +20,15 @@ import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import betamine/protocol/registry
-import betamine/world
+import gleam/bool
 import gleam/erlang/process.{type Subject}
+import gleam/float
 import gleam/function
+import gleam/int
 import gleam/io
 import gleam/list
 import gleam/otp/actor
+import gleam/set
 import gleam/string
 import glisten
 
@@ -38,6 +43,8 @@ type State {
     subject_for_host: Subject(Packet),
     game_subject: Subject(message.GameMessage),
     subject_for_game: Subject(message.PlayerSessionMessage),
+    world_subject: Subject(message.WorldMessage),
+    subject_for_world: Subject(message.PlayerSessionMessage),
     connection: glisten.Connection(BitArray),
     phase: phase.Phase,
     last_keep_alive: Int,
@@ -46,6 +53,8 @@ type State {
     main_hand: entity_handedness.EntityHandedness,
     model_customization: player_model_customization.PlayerModelCustomization,
     ignore_position_packets: Bool,
+    position: position.Position,
+    loaded_chunks: set.Set(chunk_position.ChunkPosition),
   )
 }
 
@@ -56,9 +65,11 @@ type Error {
 
 pub fn start(
   game_subject: Subject(message.GameMessage),
+  world_subject: Subject(message.WorldMessage),
   connection: glisten.Connection(BitArray),
 ) -> Result(actor.Started(Subject(Packet)), actor.StartError) {
   actor.new_with_initialiser(1000, fn(subject_for_host) {
+    let subject_for_world = process.new_subject()
     let subject_for_game = process.new_subject()
     let selector =
       process.new_selector()
@@ -69,6 +80,8 @@ pub fn start(
         subject_for_host:,
         game_subject:,
         subject_for_game:,
+        world_subject:,
+        subject_for_world:,
         connection:,
         phase: phase.Handshaking,
         last_keep_alive: now_seconds(),
@@ -77,6 +90,8 @@ pub fn start(
         main_hand: entity_handedness.Right,
         model_customization: player_model_customization.default(),
         ignore_position_packets: True,
+        position: position.default,
+        loaded_chunks: set.new(),
       ))
       |> actor.selecting(selector)
       |> actor.returning(subject_for_host),
@@ -134,7 +149,13 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
   let state = case state.phase {
     phase.Play if offset >= 15 -> {
       send(state, [
-        clientbound.PlayKeepAlive(clientbound.PlayKeepAlivePacket(0)),
+        clientbound.PlayKeepAlive(clientbound.KeepAlivePacket(0)),
+      ])
+      State(..state, last_keep_alive: now_seconds())
+    }
+    phase.Configuration if offset >= 15 -> {
+      send(state, [
+        clientbound.ConfigurationKeepAlive(clientbound.KeepAlivePacket(0)),
       ])
       State(..state, last_keep_alive: now_seconds())
     }
@@ -152,13 +173,13 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.StatusRequest -> {
       send(state, [
         clientbound.StatusResponse(clientbound.StatusResponsePacket(
-          version_name: constants.mc_version_name,
-          version_protocol: constants.mc_version_protocol,
-          max_player_count: constants.mc_max_player_count,
+          version_name: constant.mc_version_name,
+          version_protocol: constant.mc_version_protocol,
+          max_player_count: constant.mc_max_player_count,
           online_player_count: 0,
           players: [#("zwubs", "0c3456dc-85a0-4baf-89b4-db008ec1c749")],
           description: "Hello Betamine!",
-          favicon: constants.mc_favicon,
+          favicon: constant.mc_favicon,
           enforces_secure_chat: False,
         )),
       ])
@@ -200,7 +221,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
                 clientbound.KnownDataPack(
                   "minecraft",
                   "core",
-                  constants.mc_version_name,
+                  constant.mc_version_name,
                 ),
               ]),
             ),
@@ -263,6 +284,37 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           state.model_customization,
         ),
       )
+
+      let chunk_range =
+        list.range({ constant.mc_view_distance + 1 } * -1, {
+          constant.mc_view_distance + 1
+        })
+      let chunk_positions =
+        list.fold(chunk_range, set.new(), fn(positions, x) {
+          list.fold(chunk_range, positions, fn(positions, z) {
+            set.insert(positions, chunk_position.new(x, z))
+          })
+        })
+
+      let chunk_packets =
+        set.fold(chunk_positions, [], fn(packets, position) {
+          let chunk =
+            process.call(state.world_subject, 1000, message.GetChunk(
+              _,
+              position,
+            ))
+          [
+            clientbound.LevelChunkWithLight(
+              clientbound.LevelChunkWithLightPacket(
+                ..clientbound.default_level_chunk_with_light_packet(),
+                position:,
+                chunk:,
+              ),
+            ),
+            ..packets
+          ]
+        })
+
       send(state, [
         clientbound.Login(
           clientbound.LoginPacket(
@@ -278,11 +330,16 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
         clientbound.GameEvent(clientbound.GameEventPacket(
           game_event: game_event.WaitForChunks,
         )),
-        clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(0, 0)),
+        clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(
+          chunk_position.default,
+        )),
         clientbound.SetDefaultSpawnPosition(
           clientbound.SetDefaultSpawnPositionPacket(
             dimension: #("minecraft", "overworld"),
-            position: vector3.truncate(constants.mc_player_spawn_point),
+            position: vector3.map(
+              constant.mc_player_spawn_point,
+              float.truncate,
+            ),
             rotation: rotation.Rotation(0.0, 0.0),
           ),
         ),
@@ -295,46 +352,39 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             0,
           ),
         ),
-        ..world.generate(world.WorldGenerationOptions(
-          seed: 0.0,
-          chunk_length: 8,
-          water_level: 0,
-          min_terrain_height: -16,
-          max_terrain_height: 16,
-        ))
+        ..chunk_packets
       ])
-      Ok(State(..state, phase: phase.Play, ignore_position_packets: True))
+      Ok(
+        State(
+          ..state,
+          phase: phase.Play,
+          ignore_position_packets: True,
+          loaded_chunks: chunk_positions,
+        ),
+      )
     }
     serverbound.ConfirmTeleport(_) -> {
       Ok(State(..state, ignore_position_packets: False))
     }
     serverbound.PlayerPosition(packet) -> {
-      case state.ignore_position_packets {
-        True -> Nil
-        False -> {
-          process.send(
-            state.game_subject,
-            message.MovePlayer(state.uuid, packet.position, packet.on_ground),
-          )
-        }
-      }
-      Ok(state)
+      use <- bool.guard(state.ignore_position_packets, Ok(state))
+      process.send(
+        state.game_subject,
+        message.MovePlayer(state.uuid, packet.position, packet.on_ground),
+      )
+      handle_player_move(state, packet.position)
     }
     serverbound.PlayerPositionAndRotation(packet) -> {
-      case state.ignore_position_packets {
-        True -> Nil
-        False -> {
-          process.send(
-            state.game_subject,
-            message.MovePlayer(state.uuid, packet.position, packet.on_ground),
-          )
-        }
-      }
       process.send(
         state.game_subject,
         message.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
       )
-      Ok(state)
+      use <- bool.guard(state.ignore_position_packets, Ok(state))
+      process.send(
+        state.game_subject,
+        message.MovePlayer(state.uuid, packet.position, packet.on_ground),
+      )
+      handle_player_move(state, packet.position)
     }
     serverbound.PlayerRotation(packet) -> {
       process.send(
@@ -432,4 +482,67 @@ fn handle_game_update(message: message.PlayerSessionMessage, state: State) {
       Ok(state)
     }
   }
+}
+
+fn handle_player_move(
+  state: State,
+  position: position.Position,
+) -> Result(State, Error) {
+  let from_chunk = chunk_position.from_position(state.position)
+  let to_chunk = chunk_position.from_position(position)
+  use <- bool.guard(from_chunk == to_chunk, Ok(State(..state, position:)))
+  let chunk_range =
+    list.range({ constant.mc_view_distance + 1 } * -1, {
+      constant.mc_view_distance + 1
+    })
+  let chunk_positions =
+    list.fold(chunk_range, set.new(), fn(positions, x) {
+      list.fold(chunk_range, positions, fn(positions, z) {
+        set.insert(
+          positions,
+          chunk_position.new(x + to_chunk.x, z + to_chunk.z),
+        )
+      })
+    })
+
+  let chunk_positions_to_load =
+    set.difference(chunk_positions, state.loaded_chunks)
+  let chunk_load_packets =
+    set.fold(chunk_positions_to_load, [], fn(packets, chunk_position) {
+      let chunk =
+        process.call(state.world_subject, 1000, message.GetChunk(
+          _,
+          chunk_position,
+        ))
+      [
+        clientbound.LevelChunkWithLight(
+          clientbound.LevelChunkWithLightPacket(
+            ..clientbound.default_level_chunk_with_light_packet(),
+            position: chunk_position,
+            chunk:,
+          ),
+        ),
+        ..packets
+      ]
+    })
+  send(state, chunk_load_packets)
+
+  let chunk_positions_to_unload =
+    set.difference(state.loaded_chunks, chunk_positions)
+  let chunk_unload_packets =
+    set.fold(chunk_positions_to_unload, [], fn(packets, chunk_position) {
+      [
+        clientbound.ForgetLevelChunk(clientbound.ForgetLevelChunkPacket(
+          position: chunk_position,
+        )),
+        ..packets
+      ]
+    })
+  send(state, chunk_unload_packets)
+
+  send(state, [
+    clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(to_chunk)),
+    // clientbound.SystemChat(clientbound.SystemChatPacket("(" <> int.to_string(to_chunk.x) <> "," <> int.to_string(to_chunk.z) <> ")", True)),
+  ])
+  Ok(State(..state, position:, loaded_chunks: chunk_positions))
 }

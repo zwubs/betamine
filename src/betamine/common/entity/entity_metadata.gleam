@@ -1,10 +1,10 @@
+import betamine/common/block_position
 import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/entity_kind
 import betamine/common/entity/entity_pose
 import betamine/common/entity/player/player_model_customization
 import betamine/common/particle
-import betamine/common/position
 import betamine/common/text_component
 import betamine/protocol/common/entity/entity_metadata.{type DataType}
 import gleam/dict
@@ -319,7 +319,7 @@ pub fn get_optional_position(metadata: EntityMetadata, index: Int) {
 pub fn set_optional_position(
   metadata: EntityMetadata,
   index: Int,
-  position: option.Option(position.Position),
+  position: option.Option(block_position.BlockPosition),
 ) {
   todo
 }

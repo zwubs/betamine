@@ -1,10 +1,13 @@
+import betamine/common/entity/player/player_game_mode
 import betamine/common/math/vector3.{Vector3}
 
 // Hosting Constants
 pub const default_host_port = 25_565
 
 // Mojang Constants
-pub const mojang_base_profile_url = "https://sessionserver.mojang.com/session/minecraft/profile/"
+pub const mojang_base_profile_host = "sessionserver.mojang.com"
+
+pub const mojang_base_profile_path = "session/minecraft/profile"
 
 // Minecraft Constants
 pub const mc_version_name = "1.21.11"
@@ -17,10 +20,12 @@ pub const mc_favicon = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACA
 
 pub const mc_view_distance = 4
 
+pub const mc_player_game_mode = player_game_mode.Survival
+
 pub const mc_simulation_distance = 2
 
-pub const mc_player_spawn_point = Vector3(0.0, 16.0, 0.0)
+pub const mc_player_spawn_point = Vector3(0.0, 96.0, 0.0)
 
-pub const mc_world_chunk_section_height = 24
+pub const mc_world_chunk_sections_per_chunk = 24
 
-pub const mc_world_chunk_offset = 4
+pub const mc_world_chunk_offset = -4

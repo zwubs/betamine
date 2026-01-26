@@ -1,28 +1,31 @@
 import betamine/common/block/block_state
+import betamine/common/block_position
 import betamine/common/chat/chat_session
+import betamine/common/chunk_position
 import betamine/common/difficulty.{type Difficulty}
 import betamine/common/entity/entity_animation
 import betamine/common/entity/entity_kind
 import betamine/common/entity/player/player_game_mode
 import betamine/common/identifier
 import betamine/common/math/vector3.{type Vector3}
-import betamine/common/position
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
 import betamine/common/uuid
-import betamine/constants
+import betamine/constant
 import betamine/protocol/common
 import betamine/protocol/common/chunk
 import betamine/protocol/common/entity/entity_metadata
 import betamine/protocol/common/game_event
 import betamine/protocol/encoder
 import gleam/bytes_tree.{type BytesTree}
+import gleam/float
 import gleam/function
 import gleam/int
 import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
 import gleam/set
+import nbeet
 
 pub type Packet {
   StatusResponse(packet: StatusResponsePacket)
@@ -34,9 +37,11 @@ pub type Packet {
   KnownDataPacks(packet: KnownDataPacksPacket)
   Registry(packet: RegistryPacket)
   FinishConfiguration
+  ConfigurationKeepAlive(packet: KeepAlivePacket)
   BundleDelimiter
   Login(packet: LoginPacket)
   ChangeDifficulty(packet: ChangeDifficultyPacket)
+  ForgetLevelChunk(packet: ForgetLevelChunkPacket)
   GameEvent(packet: GameEventPacket)
   SetCenterChunk(packet: SetCenterChunkPacket)
   LevelChunkWithLight(packet: LevelChunkWithLightPacket)
@@ -48,12 +53,13 @@ pub type Packet {
   UpdateEntityRotation(packet: UpdateEntityRotationPacket)
   SetHeadRotation(packet: SetHeadRotationPacket)
   RemoveEntities(packet: RemoveEntitiesPacket)
-  PlayKeepAlive(packet: PlayKeepAlivePacket)
+  PlayKeepAlive(packet: KeepAlivePacket)
   SetEntityMetadata(packet: SetEntityMetadataPacket)
   AnimateEntity(packet: AnimateEntityPacket)
   AcknowledgeBlockChange(packet: AcknowledgeBlockChangePacket)
   BlockUpdate(packet: BlockUpdatePacket)
   SetDefaultSpawnPosition(packet: SetDefaultSpawnPositionPacket)
+  SystemChat(packet: SystemChatPacket)
 }
 
 fn get_packet_id(packet: Packet) -> Int {
@@ -67,9 +73,11 @@ fn get_packet_id(packet: Packet) -> Int {
     UpdateTags(..) -> 13
     KnownDataPacks(..) -> 14
     FinishConfiguration -> 3
+    ConfigurationKeepAlive(..) -> 4
     BundleDelimiter -> 0
     Login(..) -> 48
     ChangeDifficulty(..) -> 10
+    ForgetLevelChunk(..) -> 37
     GameEvent(..) -> 38
     SetCenterChunk(..) -> 92
     LevelChunkWithLight(..) -> 44
@@ -87,6 +95,7 @@ fn get_packet_id(packet: Packet) -> Int {
     AcknowledgeBlockChange(..) -> 4
     BlockUpdate(..) -> 8
     SetDefaultSpawnPosition(..) -> 95
+    SystemChat(..) -> 119
   }
 }
 
@@ -105,6 +114,7 @@ pub fn encode(packet: Packet) -> BytesTree {
     BundleDelimiter -> function.identity
     Login(packet) -> encode_login(_, packet)
     ChangeDifficulty(packet) -> encode_change_difficulty(_, packet)
+    ForgetLevelChunk(packet) -> encode_forget_level_chunk(_, packet)
     GameEvent(packet) -> encode_game_event(_, packet)
     SetCenterChunk(packet) -> encode_set_center_chunk(_, packet)
     LevelChunkWithLight(packet) -> encode_level_chunk_with_light(_, packet)
@@ -119,7 +129,10 @@ pub fn encode(packet: Packet) -> BytesTree {
     UpdateEntityRotation(packet) -> encode_update_entity_rotation(_, packet)
     SetHeadRotation(packet) -> encode_set_head_rotation(_, packet)
     RemoveEntities(packet) -> encode_remove_entities(_, packet)
-    PlayKeepAlive(packet) -> encode_play_keep_alive(_, packet)
+    PlayKeepAlive(packet) | ConfigurationKeepAlive(packet) -> encode_keep_alive(
+      _,
+      packet,
+    )
     SetEntityMetadata(packet) -> encode_set_entity_metadata(_, packet)
     AnimateEntity(packet) -> encode_animate_entity(_, packet)
     AcknowledgeBlockChange(packet) -> encode_acknowledge_block_change(_, packet)
@@ -128,6 +141,7 @@ pub fn encode(packet: Packet) -> BytesTree {
       _,
       packet,
     )
+    SystemChat(packet) -> encode_system_chat(_, packet)
   }
 }
 
@@ -286,8 +300,8 @@ pub type LoginPacket {
     dimension_id: Int,
     dimension_name: identifier.Identifier,
     hashed_seed: Int,
-    game_mode: Int,
-    previous_game_mode: Int,
+    game_mode: player_game_mode.PlayerGameMode,
+    previous_game_mode: option.Option(player_game_mode.PlayerGameMode),
     is_debug: Bool,
     is_flat: Bool,
     death_location: Option(DeathLocation),
@@ -301,17 +315,17 @@ pub const default_login = LoginPacket(
   entity_id: 0,
   is_hardcore: False,
   dimensions: [#("minecraft", "overworld")],
-  max_player_count: constants.mc_max_player_count,
-  view_distance: constants.mc_view_distance,
-  simulation_distance: constants.mc_simulation_distance,
+  max_player_count: constant.mc_max_player_count,
+  view_distance: constant.mc_view_distance,
+  simulation_distance: constant.mc_simulation_distance,
   reduced_debug_info: False,
   enable_respawn_screen: False,
   do_limited_crafting: False,
   dimension_id: 0,
   dimension_name: #("minecraft", "overworld"),
   hashed_seed: 0,
-  game_mode: 0,
-  previous_game_mode: -1,
+  game_mode: constant.mc_player_game_mode,
+  previous_game_mode: option.None,
   is_debug: False,
   is_flat: False,
   death_location: None,
@@ -334,8 +348,11 @@ pub fn encode_login(tree: BytesTree, packet: LoginPacket) {
   |> encoder.var_int(packet.dimension_id)
   |> common.encode_identifier(packet.dimension_name)
   |> encoder.long(packet.hashed_seed)
-  |> encoder.byte(packet.game_mode)
-  |> encoder.byte(packet.previous_game_mode)
+  |> encoder.byte(player_game_mode.to_int(packet.game_mode))
+  |> encoder.byte(
+    option.map(packet.previous_game_mode, player_game_mode.to_int)
+    |> option.unwrap(-1),
+  )
   |> encoder.bool(packet.is_debug)
   |> encoder.bool(packet.is_flat)
   |> encoder.optional(packet.death_location, encode_death_location)
@@ -351,7 +368,7 @@ pub type DeathLocation {
 fn encode_death_location(tree: BytesTree, death_location: DeathLocation) {
   tree
   |> common.encode_identifier(death_location.dimension)
-  |> encoder.position(death_location.position |> vector3.truncate)
+  |> encoder.position(death_location.position |> vector3.map(float.truncate))
 }
 
 pub type ChangeDifficultyPacket {
@@ -364,6 +381,16 @@ fn encode_change_difficulty(tree: BytesTree, packet: ChangeDifficultyPacket) {
   |> encoder.bool(packet.locked)
 }
 
+pub type ForgetLevelChunkPacket {
+  ForgetLevelChunkPacket(position: chunk_position.ChunkPosition)
+}
+
+fn encode_forget_level_chunk(tree: BytesTree, packet: ForgetLevelChunkPacket) {
+  tree
+  |> encoder.int(packet.position.z)
+  |> encoder.int(packet.position.x)
+}
+
 pub type GameEventPacket {
   GameEventPacket(game_event: game_event.GameEvent)
 }
@@ -373,19 +400,18 @@ fn encode_game_event(tree: BytesTree, packet: GameEventPacket) {
 }
 
 pub type SetCenterChunkPacket {
-  SetCenterChunkPacket(x: Int, y: Int)
+  SetCenterChunkPacket(position: chunk_position.ChunkPosition)
 }
 
 fn encode_set_center_chunk(tree: BytesTree, packet: SetCenterChunkPacket) {
   tree
-  |> encoder.var_int(packet.x)
-  |> encoder.var_int(packet.y)
+  |> encoder.var_int(packet.position.x)
+  |> encoder.var_int(packet.position.z)
 }
 
 pub type LevelChunkWithLightPacket {
   LevelChunkWithLightPacket(
-    x: Int,
-    z: Int,
+    position: chunk_position.ChunkPosition,
     heightmaps: List(Nil),
     chunk: chunk.Chunk,
     block_entities: List(Nil),
@@ -402,8 +428,7 @@ pub fn default_level_chunk_with_light_packet() {
   let sky_light_array = list.range(1, 2048) |> list.map(fn(_) { 0xFF })
   let block_light_array = sky_light_array |> list.map(fn(_) { 0x0 })
   LevelChunkWithLightPacket(
-    x: 0,
-    z: 0,
+    position: chunk_position.default,
     heightmaps: [],
     chunk: chunk.default(),
     block_entities: [],
@@ -426,8 +451,8 @@ fn encode_level_chunk_with_light(
   packet: LevelChunkWithLightPacket,
 ) {
   tree
-  |> encoder.int(packet.x)
-  |> encoder.int(packet.z)
+  |> encoder.int(packet.position.x)
+  |> encoder.int(packet.position.z)
   |> encoder.array(packet.heightmaps, fn(_, _) { todo as "Encode heightmaps" })
   |> chunk.encode(packet.chunk)
   |> encoder.array(packet.block_entities, fn(_, _) {
@@ -660,11 +685,11 @@ fn encode_remove_entities(tree: BytesTree, packet: RemoveEntitiesPacket) {
   encoder.array(tree, packet.entity_ids, encoder.var_int)
 }
 
-pub type PlayKeepAlivePacket {
-  PlayKeepAlivePacket(id: Int)
+pub type KeepAlivePacket {
+  KeepAlivePacket(id: Int)
 }
 
-fn encode_play_keep_alive(tree: BytesTree, packet: PlayKeepAlivePacket) {
+fn encode_keep_alive(tree: BytesTree, packet: KeepAlivePacket) {
   encoder.long(tree, packet.id)
 }
 
@@ -704,7 +729,7 @@ pub fn encode_acknowledge_block_change(
 
 pub type BlockUpdatePacket {
   BlockUpdatePacket(
-    position: position.Position,
+    position: block_position.BlockPosition,
     block_state: block_state.BlockState,
   )
 }
@@ -718,7 +743,7 @@ pub fn encode_block_update(tree: BytesTree, packet: BlockUpdatePacket) {
 pub type SetDefaultSpawnPositionPacket {
   SetDefaultSpawnPositionPacket(
     dimension: identifier.Identifier,
-    position: position.Position,
+    position: block_position.BlockPosition,
     rotation: rotation.Rotation,
   )
 }
@@ -732,4 +757,16 @@ pub fn encode_set_default_spawn_position(
   |> encoder.position(packet.position)
   |> encoder.float(packet.rotation.yaw)
   |> encoder.float(packet.rotation.pitch)
+}
+
+pub type SystemChatPacket {
+  SystemChatPacket(content: String, overlay: Bool)
+}
+
+pub fn encode_system_chat(tree: BytesTree, packet: SystemChatPacket) {
+  let assert Ok(nbt) =
+    nbeet.java_network_encode(
+      nbeet.root([#("text", nbeet.string(packet.content))]),
+    )
+  tree |> encoder.raw(nbt) |> encoder.bool(packet.overlay)
 }

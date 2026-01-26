@@ -7,11 +7,12 @@ import betamine/common/entity/player
 import betamine/common/math/vector3
 import betamine/common/profile
 import betamine/common/uuid
-import betamine/constants
+import betamine/constant
 import betamine/message
 import betamine/mojang
 import gleam/dict
 import gleam/erlang/process.{type Subject}
+import gleam/float
 import gleam/list
 import gleam/otp/actor
 import gleam/result
@@ -71,7 +72,7 @@ fn loop(
           ..entity.new(entity_kind.Player),
           id: dict.size(game.entities),
           uuid:,
-          position: constants.mc_player_spawn_point,
+          position: constant.mc_player_spawn_point,
         )
       let player = player.Player(profile:, entity:)
       process.send(player_subject, player)
@@ -93,7 +94,7 @@ fn loop(
                 game,
                 message.EntityPositionUpdated(
                   entity.id,
-                  vector3.subtract(new_position, entity.position),
+                  vector3.map2(new_position, entity.position, float.subtract),
                   on_ground,
                 ),
               )

@@ -1,4 +1,4 @@
-import betamine/common/position
+import betamine/common/block_position
 import betamine/common/slot
 
 pub type Particle {
@@ -48,7 +48,7 @@ pub type Particle {
   InstantEffect
   Item(item: slot.Slot)
   // Split into 2
-  BlockVibration(block_position: position.Position, ticks: Int)
+  BlockVibration(block_position: block_position.BlockPosition, ticks: Int)
   EntityVibration(entity_id: Int, entity_eye_height: Float, ticks: Int)
   ItemSlime
   ItemCobweb

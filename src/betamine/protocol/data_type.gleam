@@ -17,7 +17,7 @@ pub type DataType {
   Identifier(identifier.Identifier)
   VarInt(Int)
   VarLong(Int)
-  Position(vector3.Vector3(Int))
+  BlockPosition(vector3.Vector3(Int))
   Angle(Int)
   Uuid(uuid.Uuid)
   Optional(option.Option(DataType))

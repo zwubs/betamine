@@ -1,4 +1,4 @@
-import betamine/constants.{mc_world_chunk_section_height}
+import betamine/constant.{mc_world_chunk_sections_per_chunk}
 import betamine/protocol/common/chunk/chunk_section
 import betamine/protocol/encoder
 import gleam/bytes_tree
@@ -10,7 +10,7 @@ pub type Chunk {
 
 pub fn default() {
   Chunk(
-    chunk_sections: list.range(0, mc_world_chunk_section_height - 1)
+    chunk_sections: list.range(0, mc_world_chunk_sections_per_chunk - 1)
     |> list.map(fn(index) {
       case index <= 3 {
         True -> chunk_section.default
