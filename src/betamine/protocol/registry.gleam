@@ -185,6 +185,13 @@ fn registries() {
                 #("min_inclusive", nbeet.int(0)),
               ]),
             ),
+            #(
+              "attributes",
+              nbeet.compound([
+                #("minecraft:visual/fog_color", nbeet.string("#c0d8ff")),
+                #("minecraft:visual/sky_color", nbeet.string("#78a7ff")),
+              ]),
+            ),
           ]),
         ),
       ),
