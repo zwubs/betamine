@@ -67,24 +67,7 @@ fn registries() {
     #("wolf_variant", [#("pale", option.None)]),
     #("wolf_sound_variant", [#("classic", option.None)]),
     #("painting_variant", [#("unpacked", option.None)]),
-    #("worldgen/biome", [
-      #(
-        "plains",
-        option.Some(
-          nbeet.root([
-            #("has_precipitation", nbeet.byte(1)),
-            #("temperature", nbeet.float(0.8)),
-            #("downfall", nbeet.float(0.4)),
-            #(
-              "effects",
-              nbeet.compound([
-                #("water_color", nbeet.string("#3f76e4")),
-              ]),
-            ),
-          ]),
-        ),
-      ),
-    ]),
+    #("worldgen/biome", [#("plains", option.None)]),
     #("dimension_type", [
       #(
         "overworld",
