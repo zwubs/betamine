@@ -223,6 +223,11 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
                   "core",
                   constant.mc_version_name,
                 ),
+                clientbound.KnownDataPack(
+                  "minecraft",
+                  "core",
+                  constant.mc_version_name <> "_unobfuscated",
+                ),
               ]),
             ),
           ])
