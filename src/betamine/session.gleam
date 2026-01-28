@@ -7,9 +7,9 @@ import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import gleam/erlang/process
+import gleam/io
 import gleam/list
 import gleam/option
-import gleam/otp/actor
 import gleam/otp/factory_supervisor
 import gleam/result
 import gleam/string
@@ -38,6 +38,7 @@ pub fn init(
 ) -> #(State, option.Option(process.Selector(Clientbound))) {
   let assert Ok(connection_info) = glisten.get_client_info(connection)
   let ip_address = glisten.ip_address_to_string(connection_info.ip_address)
+  io.println("Starting connection w/ " <> ip_address)
 
   let players = factory_supervisor.get_by_name(players_name)
 
@@ -60,6 +61,10 @@ pub fn init(
 
 @external(erlang, "betamine_ffi", "now_seconds")
 pub fn now_seconds() -> Int
+
+pub fn close(state: State) {
+  io.println("Closing connection w/ " <> state.ip_address)
+}
 
 pub fn loop(
   state: State,
@@ -133,9 +138,11 @@ fn handle_packet(
         _ -> Error(InvalidPacket(state.phase, packet))
       }
     }
-    phase.Login -> todo
-    phase.Configuration -> todo
-    phase.Play -> todo
+    phase.Login -> {
+      Error(InvalidPacket(state.phase, packet))
+    }
+    phase.Configuration -> Error(InvalidPacket(state.phase, packet))
+    phase.Play -> Error(InvalidPacket(state.phase, packet))
   }
 }
 

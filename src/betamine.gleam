@@ -9,7 +9,6 @@ import gleam/int
 import gleam/io
 import gleam/otp/factory_supervisor as factory
 import gleam/otp/static_supervisor as supervisor
-import gleam/otp/supervision
 import glisten
 
 pub fn main() {
@@ -28,6 +27,7 @@ pub fn main() {
   let http_server =
     glisten.new(session.init(_, players_name), session.loop)
     |> glisten.bind(constant.default_server_interface)
+    |> glisten.with_close(session.close)
     |> glisten.supervised(constant.default_server_port)
 
   let assert Ok(_sup_tree) =
