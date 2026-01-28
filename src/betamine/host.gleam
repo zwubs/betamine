@@ -9,20 +9,12 @@ pub fn start(
   game_subject: Subject(message.GameMessage),
   world_subject: Subject(message.WorldMessage),
 ) {
-  start_with_port(game_subject, world_subject, constant.default_host_port)
-}
-
-pub fn start_with_port(
-  game_subject: Subject(message.GameMessage),
-  world_subject: Subject(message.WorldMessage),
-  port: Int,
-) {
   glisten.new(init(_, game_subject, world_subject), loop)
-  |> glisten.bind("0.0.0.0")
+  |> glisten.bind(constant.default_server_interface)
   |> glisten.with_close(fn(subject) {
     process.send(subject, player_session.Disconnect)
   })
-  |> glisten.start(port)
+  |> glisten.start(constant.default_server_port)
 }
 
 fn init(

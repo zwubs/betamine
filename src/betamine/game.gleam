@@ -15,7 +15,14 @@ import gleam/erlang/process.{type Subject}
 import gleam/float
 import gleam/list
 import gleam/otp/actor
+import gleam/otp/supervision
 import gleam/result
+
+type Message =
+  message.GameMessage
+
+type Name =
+  process.Name(Message)
 
 type Game {
   Game(
@@ -33,26 +40,26 @@ type Session {
   )
 }
 
-pub fn start() -> Result(Subject(message.GameMessage), actor.StartError) {
-  let start_result =
-    actor.new(Game(
-      sessions: dict.new(),
-      profiles: dict.new(),
-      entities: dict.new(),
-    ))
-    |> actor.on_message(loop)
-    |> actor.start()
-
-  case start_result {
-    Ok(started) -> Ok(started.data)
-    Error(err) -> Error(err)
-  }
+pub fn supervised(
+  name: Name,
+) -> supervision.ChildSpecification(process.Subject(Message)) {
+  supervision.worker(fn() { start(name) })
 }
 
-fn loop(
-  game: Game,
-  message: message.GameMessage,
-) -> actor.Next(Game, message.GameMessage) {
+pub fn start(
+  name: Name,
+) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  actor.new(Game(
+    sessions: dict.new(),
+    profiles: dict.new(),
+    entities: dict.new(),
+  ))
+  |> actor.on_message(loop)
+  |> actor.named(name)
+  |> actor.start()
+}
+
+fn loop(game: Game, message: Message) -> actor.Next(Game, Message) {
   case message {
     message.GetAllPlayers(subject) -> {
       list.filter_map(dict.to_list(game.profiles), fn(tuple) {

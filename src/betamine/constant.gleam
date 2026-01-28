@@ -1,8 +1,10 @@
 import betamine/common/entity/player/player_game_mode
 import betamine/common/math/vector3.{Vector3}
 
-// Hosting Constants
-pub const default_host_port = 25_565
+// Server Constants
+pub const default_server_interface = "0.0.0.0"
+
+pub const default_server_port = 25_565
 
 // Mojang Constants
 pub const mojang_base_profile_host = "sessionserver.mojang.com"

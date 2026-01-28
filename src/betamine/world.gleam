@@ -8,8 +8,14 @@ import gleam/dict
 import gleam/erlang/process
 import gleam/list
 import gleam/otp/actor
-import gleam/result
+import gleam/otp/supervision
 import gleam/set
+
+type Message =
+  message.WorldMessage
+
+type Name =
+  process.Name(Message)
 
 type World {
   World(
@@ -18,10 +24,15 @@ type World {
   )
 }
 
-pub fn start() -> Result(
-  process.Subject(message.WorldMessage),
-  actor.StartError,
-) {
+pub fn supervised(
+  name: Name,
+) -> supervision.ChildSpecification(process.Subject(Message)) {
+  supervision.worker(fn() { start(name) })
+}
+
+pub fn start(
+  name: Name,
+) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
   actor.new(World(
     generation.GenerationOptions(
       seed: 0.0,
@@ -33,18 +44,11 @@ pub fn start() -> Result(
     dict.new(),
   ))
   |> actor.on_message(loop)
+  |> actor.named(name)
   |> actor.start()
-  |> result.map(fn(started) {
-    let subject = started.data
-    actor.send(subject, message.GenerateSpawnChunks)
-    subject
-  })
 }
 
-fn loop(
-  world: World,
-  message: message.WorldMessage,
-) -> actor.Next(World, message.WorldMessage) {
+fn loop(world: World, message: Message) -> actor.Next(World, Message) {
   case message {
     message.GenerateSpawnChunks -> {
       let chunk_range =
