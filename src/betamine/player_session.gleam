@@ -24,7 +24,6 @@ import gleam/bool
 import gleam/erlang/process.{type Subject}
 import gleam/float
 import gleam/function
-import gleam/int
 import gleam/io
 import gleam/list
 import gleam/otp/actor

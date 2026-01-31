@@ -1,6 +1,6 @@
-import betamine/common/uuid
 import betamine/constant
-import betamine/player
+import betamine/player/player
+import betamine/player/player_manager
 import betamine/protocol
 import betamine/protocol/error
 import betamine/protocol/packets/clientbound
@@ -10,7 +10,6 @@ import gleam/erlang/process
 import gleam/io
 import gleam/list
 import gleam/option
-import gleam/otp/factory_supervisor
 import gleam/result
 import gleam/string
 import glisten
@@ -23,24 +22,20 @@ pub type State {
     phase: phase.Phase,
     last_keep_alive: Int,
     ip_address: String,
-    players: factory_supervisor.Supervisor(
-      uuid.Uuid,
-      process.Subject(player.Message),
-    ),
+    player_subject: option.Option(process.Subject(player.Message)),
+    player_manager_subject: process.Subject(player_manager.Message),
   )
 }
 
 pub fn init(
   connection: glisten.Connection(Clientbound),
-  players_name: process.Name(
-    factory_supervisor.Message(uuid.Uuid, process.Subject(player.Message)),
-  ),
+  player_manager_name: process.Name(player_manager.Message),
 ) -> #(State, option.Option(process.Selector(Clientbound))) {
   let assert Ok(connection_info) = glisten.get_client_info(connection)
   let ip_address = glisten.ip_address_to_string(connection_info.ip_address)
   io.println("Starting connection w/ " <> ip_address)
 
-  let players = factory_supervisor.get_by_name(players_name)
+  let player_manager_subject = process.named_subject(player_manager_name)
 
   let self = process.new_subject()
 
@@ -48,8 +43,9 @@ pub fn init(
     State(
       phase: phase.Handshaking,
       last_keep_alive: now_seconds(),
+      player_subject: option.None,
       ip_address:,
-      players:,
+      player_manager_subject:,
     )
 
   let selector =
@@ -95,16 +91,18 @@ fn handle_packet(
   bit_array: BitArray,
   connection: glisten.Connection(Clientbound),
 ) -> Result(State, ServerboundError) {
+  let State(phase: current_phase, player_subject:, player_manager_subject:, ..) =
+    state
   let server_bound = protocol.decode_serverbound(state.phase, bit_array)
   use packet <- result.try(server_bound |> result.map_error(ProtocolError))
-  case state.phase {
+  case current_phase {
     phase.Handshaking -> {
       case packet {
         serverbound.Handshake(packet) -> {
           case packet.next_phase {
             1 -> Ok(State(..state, phase: phase.Status))
             2 -> Ok(State(..state, phase: phase.Login))
-            phase -> Error(InvalidProtocolPhase(phase))
+            next_phase -> Error(InvalidProtocolPhase(next_phase))
           }
         }
         _ -> Error(InvalidPacket(state.phase, packet))
@@ -139,10 +137,47 @@ fn handle_packet(
       }
     }
     phase.Login -> {
-      Error(InvalidPacket(state.phase, packet))
+      case packet {
+        serverbound.LoginStart(packet) -> {
+          let new_player_message = player_manager.New(_, packet.uuid)
+          let new_player_result =
+            process.call(player_manager_subject, 1000, new_player_message)
+          case new_player_result {
+            Ok(#(player_subject, profile)) -> {
+              use _ <- result.try(send_packet(
+                connection,
+                clientbound.LoginSuccess(clientbound.LoginSuccessPacket(profile)),
+              ))
+              Ok(State(..state, player_subject: option.Some(player_subject)))
+            }
+            Error(actor_start_error) -> {
+              todo
+            }
+          }
+        }
+        serverbound.LoginAcknowledged ->
+          Ok(State(..state, phase: phase.Configuration))
+        _ -> Error(InvalidPacket(state.phase, packet))
+      }
     }
     phase.Configuration -> Error(InvalidPacket(state.phase, packet))
     phase.Play -> Error(InvalidPacket(state.phase, packet))
+  }
+}
+
+pub fn handle_spawn_player(state: State) {
+  todo
+}
+
+pub fn handle_disconnect(
+  connection: glisten.Connection(Clientbound),
+  phase: phase.Phase,
+) {
+  case phase {
+    phase.Login -> todo
+    phase.Configuration -> todo
+    phase.Play -> todo
+    _ -> Nil
   }
 }
 
