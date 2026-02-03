@@ -1,5 +1,3 @@
-import betamine/protocol/error
-
 pub type EntityKind {
   AcaciaBoat
   AcaciaChestBoat

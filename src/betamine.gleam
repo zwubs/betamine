@@ -5,7 +5,6 @@ import betamine/session
 import betamine/world
 import gleam/erlang/process
 import gleam/int
-import gleam/io
 import gleam/otp/static_supervisor
 import glisten
 import logging

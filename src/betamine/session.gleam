@@ -8,7 +8,6 @@ import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import gleam/erlang/process
-import gleam/io
 import gleam/list
 import gleam/option
 import gleam/otp/actor

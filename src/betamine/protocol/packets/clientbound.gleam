@@ -26,7 +26,6 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
 import gleam/set
-import gleam/string
 
 pub type Packet {
   StatusResponse(packet: StatusResponsePacket)
