@@ -38,11 +38,12 @@ pub fn main() {
     |> static_supervisor.add(http_server)
     |> static_supervisor.start()
 
-  io.println(
+  logging.log(
+    logging.Info,
     "Betamine listening on "
-    <> constant.default_server_interface
-    <> ":"
-    <> int.to_string(constant.default_server_port),
+      <> constant.default_server_interface
+      <> ":"
+      <> int.to_string(constant.default_server_port),
   )
   process.sleep_forever()
 }

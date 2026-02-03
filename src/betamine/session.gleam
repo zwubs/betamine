@@ -16,6 +16,7 @@ import gleam/result
 import gleam/string
 import glisten
 import glisten/socket
+import logging
 
 pub type Clientbound
 
@@ -35,7 +36,7 @@ pub fn init(
 ) -> #(State, option.Option(process.Selector(Clientbound))) {
   let assert Ok(connection_info) = glisten.get_client_info(connection)
   let ip_address = glisten.ip_address_to_string(connection_info.ip_address)
-  io.println("Starting connection w/ " <> ip_address)
+  logging.log(logging.Debug, "Starting connection w/ " <> ip_address)
 
   let player_manager_subject = process.named_subject(player_manager_name)
 
@@ -61,7 +62,7 @@ pub fn init(
 pub fn now_seconds() -> Int
 
 pub fn close(state: State) {
-  io.println("Closing connection w/ " <> state.ip_address)
+  logging.log(logging.Debug, "Closing connection w/ " <> state.ip_address)
 }
 
 pub fn loop(

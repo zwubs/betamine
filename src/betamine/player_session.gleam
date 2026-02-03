@@ -30,6 +30,7 @@ import gleam/otp/actor
 import gleam/set
 import gleam/string
 import glisten
+import logging
 
 pub type Packet {
   ServerBoundPacket(data: BitArray)
@@ -129,7 +130,8 @@ fn handle_error(error: Error, state: State) {
       actor.continue(state)
     }
     UnknownProtocolState(phase) -> {
-      io.println_error(
+      logging.log(
+        logging.Error,
         "Client Requested An Unknown Protocol State: " <> string.inspect(phase),
       )
       actor.continue(state)
