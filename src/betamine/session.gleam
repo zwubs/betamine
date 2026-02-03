@@ -121,14 +121,20 @@ fn handle_packet(
     phase.Status -> {
       case packet {
         serverbound.StatusRequest -> {
+          let players =
+            process.call(
+              state.player_manager_subject,
+              1000,
+              player_manager.GetAll,
+            )
           use _ <- result.try(send_packet(
             connection,
             clientbound.StatusResponse(clientbound.StatusResponsePacket(
               version_name: constant.mc_version_name,
               version_protocol: constant.mc_version_protocol,
               max_player_count: constant.mc_max_player_count,
-              online_player_count: 0,
-              players: [#("zwubs", "0c3456dc-85a0-4baf-89b4-db008ec1c749")],
+              online_player_count: list.length(players),
+              players:,
               description: "Hello Betamine!",
               favicon: constant.mc_favicon,
               enforces_secure_chat: False,

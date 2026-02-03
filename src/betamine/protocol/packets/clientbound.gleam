@@ -162,7 +162,7 @@ pub type StatusResponsePacket {
     version_protocol: Int,
     max_player_count: Int,
     online_player_count: Int,
-    players: List(#(String, String)),
+    players: List(#(uuid.Uuid, String)),
     description: String,
     favicon: String,
     enforces_secure_chat: Bool,
@@ -187,7 +187,10 @@ fn encode_status_response(tree: BytesTree, packet: StatusResponsePacket) {
           "sample",
           json.array(
             list.map(packet.players, fn(player) {
-              [#("name", json.string(player.0)), #("id", json.string(player.1))]
+              [
+                #("id", json.string(uuid.to_string(player.0))),
+                #("name", json.string(player.1)),
+              ]
             }),
             of: json.object,
           ),

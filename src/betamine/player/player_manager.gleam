@@ -3,9 +3,11 @@ import betamine/common/uuid
 import betamine/player/player
 import gleam/dict
 import gleam/erlang/process
+import gleam/list
 import gleam/otp/actor
 import gleam/otp/factory_supervisor
 import gleam/otp/supervision
+import gleam/pair
 
 pub type Message {
   New(
@@ -17,6 +19,7 @@ pub type Message {
     ),
     uuid: uuid.Uuid,
   )
+  GetAll(return_subject: process.Subject(List(#(uuid.Uuid, String))))
 }
 
 pub type Name =
@@ -81,6 +84,13 @@ fn message_handler(state: State, message: Message) -> actor.Next(State, Message)
           state
         }
       }
+    }
+    GetAll(return_subject:) -> {
+      let players =
+        dict.to_list(state.players)
+        |> list.map(pair.map_second(_, fn(instance) { instance.name }))
+      process.send(return_subject, players)
+      state
     }
   }
   |> actor.continue()
