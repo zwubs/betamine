@@ -6,9 +6,11 @@ import gleam/bit_array
 import gleam/bytes_tree.{type BytesTree}
 import gleam/float
 import gleam/int
+import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
+import nbeet
 
 pub fn bool(tree: BytesTree, bool: Bool) -> BytesTree {
   case bool {
@@ -145,4 +147,13 @@ fn bitmask_to_int(bitmask: List(Bool), accumulator: Int) {
 
 pub fn block_state(tree: BytesTree, block_state: block_state.BlockState) {
   tree |> var_int(block_state.to_int(block_state))
+}
+
+pub fn nbt(tree: BytesTree, nbt: nbeet.Nbt) {
+  let assert Ok(bit_array) = nbeet.java_network_encode(nbt)
+  bytes_tree.append(tree, bit_array)
+}
+
+pub fn json(tree: BytesTree, json: json.Json) {
+  tree |> string(json.to_string(json))
 }

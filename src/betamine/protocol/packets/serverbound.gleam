@@ -1,10 +1,12 @@
 import betamine/common/chat/chat_mode
+import betamine/common/client_information
 import betamine/common/entity/entity_hand
 import betamine/common/entity/entity_handedness
 import betamine/common/entity/player/player_command_action
 import betamine/common/entity/player/player_interaction
 import betamine/common/entity/player/player_model_customization
 import betamine/common/math/vector3.{type Vector3, Vector3}
+import betamine/common/particle_status
 import betamine/common/rotation.{type Rotation, Rotation}
 import betamine/common/uuid
 import betamine/protocol/common
@@ -19,7 +21,7 @@ pub type Packet {
   StatusPing(PingPacket)
   LoginStart(LoginStartPacket)
   LoginAcknowledged
-  ClientInformation(ClientInformationPacket)
+  ClientInformation(client_information.ClientInformation)
   Plugin(PluginPacket)
   AcknowledgeFinishConfiguration
   KnownDataPacks(KnownDataPacksPacket)
@@ -133,19 +135,6 @@ pub fn decode_login_start(bit_array: BitArray) {
   Ok(LoginStart(LoginStartPacket(name, uuid)))
 }
 
-pub type ClientInformationPacket {
-  ClientInformationPacket(
-    locale: String,
-    view_distance: Int,
-    chat_mode: chat_mode.ChatMode,
-    chat_colors: Bool,
-    model_customizations: player_model_customization.PlayerModelCustomization,
-    main_hand: entity_handedness.EntityHandedness,
-    text_filtering_enabled: Bool,
-    particle_status: Int,
-  )
-}
-
 pub fn decode_client_information(bit_array: BitArray) {
   use #(locale, bit_array) <- result.try(decoder.string(bit_array))
   use #(view_distance, bit_array) <- result.try(decoder.byte(bit_array))
@@ -165,9 +154,15 @@ pub fn decode_client_information(bit_array: BitArray) {
   use #(text_filtering_enabled, bit_array) <- result.try(decoder.boolean(
     bit_array,
   ))
-  use #(particle_status, _) <- result.try(decoder.var_int(bit_array))
+  use #(allows_listing, bit_array) <- result.try(decoder.boolean(bit_array))
+  use #(particle_status, _) <- result.try({
+    use #(particle_status, _) <- result.try({ decoder.var_int(bit_array) })
+    result.map(particle_status.from_int(particle_status), fn(hand) {
+      #(hand, bit_array)
+    })
+  })
   Ok(
-    ClientInformation(ClientInformationPacket(
+    ClientInformation(client_information.ClientInformation(
       locale,
       view_distance,
       chat_mode,
@@ -175,6 +170,7 @@ pub fn decode_client_information(bit_array: BitArray) {
       model_customizations,
       main_hand,
       text_filtering_enabled,
+      allows_listing,
       particle_status,
     )),
   )

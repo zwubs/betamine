@@ -10,6 +10,7 @@ import betamine/common/identifier
 import betamine/common/math/vector3.{type Vector3}
 import betamine/common/profile
 import betamine/common/rotation.{type Rotation}
+import betamine/common/text_component
 import betamine/common/uuid
 import betamine/constant
 import betamine/protocol/common
@@ -25,22 +26,25 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None}
 import gleam/set
-import nbeet
+import gleam/string
 
 pub type Packet {
   StatusResponse(packet: StatusResponsePacket)
   StatusPong(packet: StatusPongPacket)
+  LoginDisconnect(packet: LoginDisconnectPacket)
   LoginSuccess(packet: LoginSuccessPacket)
   Plugin(packet: PluginPacket)
   FeatureFlags(packet: FeatureFlagsPacket)
   UpdateTags(packet: UpdateTagsPacket)
   KnownDataPacks(packet: KnownDataPacksPacket)
   Registry(packet: RegistryPacket)
+  ConfigurationDisconnect(packet: DisconnectPacket)
   FinishConfiguration
   ConfigurationKeepAlive(packet: KeepAlivePacket)
   BundleDelimiter
   Login(packet: LoginPacket)
   ChangeDifficulty(packet: ChangeDifficultyPacket)
+  PlayDisconnect(packet: DisconnectPacket)
   ForgetLevelChunk(packet: ForgetLevelChunkPacket)
   GameEvent(packet: GameEventPacket)
   SetCenterChunk(packet: SetCenterChunkPacket)
@@ -66,17 +70,20 @@ fn get_packet_id(packet: Packet) -> Int {
   case packet {
     StatusResponse(..) -> 0
     StatusPong(..) -> 1
+    LoginDisconnect(..) -> 0
     LoginSuccess(..) -> 2
     Plugin(..) -> 1
     Registry(..) -> 7
     FeatureFlags(..) -> 12
     UpdateTags(..) -> 13
     KnownDataPacks(..) -> 14
+    ConfigurationDisconnect(..) -> 2
     FinishConfiguration -> 3
     ConfigurationKeepAlive(..) -> 4
     BundleDelimiter -> 0
     Login(..) -> 48
     ChangeDifficulty(..) -> 10
+    PlayDisconnect(..) -> 32
     ForgetLevelChunk(..) -> 37
     GameEvent(..) -> 38
     SetCenterChunk(..) -> 92
@@ -142,6 +149,11 @@ pub fn encode(packet: Packet) -> BytesTree {
       packet,
     )
     SystemChat(packet) -> encode_system_chat(_, packet)
+    LoginDisconnect(packet) -> encode_login_disconnect(_, packet)
+    ConfigurationDisconnect(packet) | PlayDisconnect(packet) -> encode_disconnect(
+      _,
+      packet,
+    )
   }
 }
 
@@ -221,6 +233,10 @@ pub type FeatureFlagsPacket {
   FeatureFlagsPacket(flags: List(identifier.Identifier))
 }
 
+pub const default_feature_flags = FeatureFlags(
+  FeatureFlagsPacket([#("minecraft", "vanilla")]),
+)
+
 fn encode_feature_flags(tree: BytesTree, packet: FeatureFlagsPacket) {
   encoder.array(tree, packet.flags, common.encode_identifier)
 }
@@ -232,6 +248,21 @@ pub type UpdateTagsPacket {
     ),
   )
 }
+
+pub const default_update_tags = UpdateTags(
+  UpdateTagsPacket(
+    [
+      #(
+        #("minecraft", "fluid"),
+        [
+          // References to the minecraft:fluid registry
+          #(#("minecraft", "lava"), [3, 4]),
+          #(#("minecraft", "water"), [1, 2]),
+        ],
+      ),
+    ],
+  ),
+)
 
 fn encode_update_tags(tree: BytesTree, packet: UpdateTagsPacket) {
   encoder.array(tree, packet.registries, fn(tree, registry) {
@@ -250,6 +281,20 @@ fn encode_update_tags(tree: BytesTree, packet: UpdateTagsPacket) {
 pub type KnownDataPacksPacket {
   KnownDataPacksPacket(data_packs: List(KnownDataPack))
 }
+
+pub const default_known_data_packs = KnownDataPacks(
+  KnownDataPacksPacket(
+    [
+      KnownDataPack("minecraft", "core", constant.mc_version_name),
+      KnownDataPack(
+        "minecraft",
+        "core",
+        constant.mc_version_name
+          <> "_unobfuscated",
+      ),
+    ],
+  ),
+)
 
 pub fn encode_known_data_packs(tree: BytesTree, packet: KnownDataPacksPacket) {
   encoder.array(tree, packet.data_packs, encode_known_data_pack)
@@ -760,13 +805,27 @@ pub fn encode_set_default_spawn_position(
 }
 
 pub type SystemChatPacket {
-  SystemChatPacket(content: String, overlay: Bool)
+  SystemChatPacket(content: text_component.TextComponent, overlay: Bool)
 }
 
 pub fn encode_system_chat(tree: BytesTree, packet: SystemChatPacket) {
-  let assert Ok(nbt) =
-    nbeet.java_network_encode(
-      nbeet.root([#("text", nbeet.string(packet.content))]),
-    )
-  tree |> encoder.raw(nbt) |> encoder.bool(packet.overlay)
+  tree
+  |> encoder.nbt(text_component.to_nbt(packet.content))
+  |> encoder.bool(packet.overlay)
+}
+
+pub type LoginDisconnectPacket {
+  LoginDisconnectPacket(reason: text_component.TextComponent)
+}
+
+pub fn encode_login_disconnect(tree: BytesTree, packet: LoginDisconnectPacket) {
+  tree |> encoder.json(text_component.to_json(packet.reason))
+}
+
+pub type DisconnectPacket {
+  DisconnectPacket(reason: text_component.TextComponent)
+}
+
+pub fn encode_disconnect(tree: BytesTree, packet: DisconnectPacket) {
+  tree |> encoder.nbt(text_component.to_nbt(packet.reason))
 }

@@ -1,3 +1,4 @@
+import betamine/common/text_component
 import betamine/constant
 import betamine/player/player
 import betamine/player/player_manager
@@ -10,6 +11,7 @@ import gleam/erlang/process
 import gleam/io
 import gleam/list
 import gleam/option
+import gleam/otp/actor
 import gleam/result
 import gleam/string
 import glisten
@@ -71,7 +73,14 @@ pub fn loop(
     glisten.Packet(bit_array) -> {
       case handle_packet(state, bit_array, connection) {
         Ok(state) -> glisten.continue(state)
-        Error(error) -> glisten.stop_abnormal(string.inspect(error))
+        Error(error) -> {
+          let reason = string.inspect(error)
+          echo "Disconnecting: " <> reason
+          let _ = send_disconnect(connection, state.phase, reason)
+          // Ensure enough time for the disconnect to send
+          process.sleep(100)
+          glisten.stop_abnormal(reason)
+        }
       }
     }
     glisten.User(clientbound) ->
@@ -79,20 +88,21 @@ pub fn loop(
   }
 }
 
-type ServerboundError {
+type PacketError {
   InvalidPacket(phase: phase.Phase, packet: serverbound.Packet)
   InvalidProtocolPhase(state: Int)
   ProtocolError(error: error.ProtocolError)
   SocketError(reason: socket.SocketReason)
+  PlayerNotStarted(error: actor.StartError)
+  PlayerNotFound
 }
 
 fn handle_packet(
   state: State,
   bit_array: BitArray,
   connection: glisten.Connection(Clientbound),
-) -> Result(State, ServerboundError) {
-  let State(phase: current_phase, player_subject:, player_manager_subject:, ..) =
-    state
+) -> Result(State, PacketError) {
+  let State(phase: current_phase, player_manager_subject:, ..) = state
   let server_bound = protocol.decode_serverbound(state.phase, bit_array)
   use packet <- result.try(server_bound |> result.map_error(ProtocolError))
   case current_phase {
@@ -141,7 +151,7 @@ fn handle_packet(
         serverbound.LoginStart(packet) -> {
           let new_player_message = player_manager.New(_, packet.uuid)
           let new_player_result =
-            process.call(player_manager_subject, 1000, new_player_message)
+            process.call(player_manager_subject, 10_000, new_player_message)
           case new_player_result {
             Ok(#(player_subject, profile)) -> {
               use _ <- result.try(send_packet(
@@ -150,9 +160,8 @@ fn handle_packet(
               ))
               Ok(State(..state, player_subject: option.Some(player_subject)))
             }
-            Error(actor_start_error) -> {
-              todo
-            }
+            Error(actor_start_error) ->
+              Error(PlayerNotStarted(actor_start_error))
           }
         }
         serverbound.LoginAcknowledged ->
@@ -160,25 +169,69 @@ fn handle_packet(
         _ -> Error(InvalidPacket(state.phase, packet))
       }
     }
-    phase.Configuration -> Error(InvalidPacket(state.phase, packet))
-    phase.Play -> Error(InvalidPacket(state.phase, packet))
+    phase.Configuration -> {
+      case packet {
+        serverbound.ClientInformation(client_information) -> {
+          use _ <- result.try(send_player_message(
+            state.player_subject,
+            player.UpdateClientInformation(client_information),
+          ))
+
+          use _ <- result.try(
+            send_packets(connection, [
+              clientbound.default_feature_flags,
+              clientbound.default_update_tags,
+              clientbound.default_known_data_packs,
+            ]),
+          )
+          Ok(state)
+        }
+        _ -> Error(InvalidPacket(state.phase, packet))
+      }
+    }
+    phase.Play -> {
+      case packet {
+        _ -> Error(InvalidPacket(state.phase, packet))
+      }
+    }
   }
 }
 
-pub fn handle_spawn_player(state: State) {
-  todo
+fn send_player_message(
+  subject: option.Option(process.Subject(player.Message)),
+  message: player.Message,
+) {
+  case subject {
+    option.Some(player_subject) -> Ok(process.send(player_subject, message))
+    option.None -> Error(PlayerNotFound)
+  }
 }
 
-pub fn handle_disconnect(
+fn send_disconnect(
   connection: glisten.Connection(Clientbound),
   phase: phase.Phase,
+  reason: String,
 ) {
-  case phase {
-    phase.Login -> todo
-    phase.Configuration -> todo
-    phase.Play -> todo
-    _ -> Nil
+  let packets = case phase {
+    phase.Login -> [
+      clientbound.LoginDisconnect(
+        clientbound.LoginDisconnectPacket(text_component.TextComponent(reason)),
+      ),
+    ]
+    phase.Configuration -> [
+      clientbound.ConfigurationDisconnect(
+        clientbound.DisconnectPacket(text_component.TextComponent(reason)),
+      ),
+    ]
+    phase.Play -> [
+      clientbound.PlayDisconnect(
+        clientbound.DisconnectPacket(text_component.TextComponent(reason)),
+      ),
+    ]
+    _ -> []
   }
+
+  send_packets(connection, packets)
 }
 
 pub fn handle_clientbound(

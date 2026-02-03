@@ -6,7 +6,6 @@ import gleam/erlang/process
 import gleam/otp/actor
 import gleam/otp/factory_supervisor
 import gleam/otp/supervision
-import gleam/pair
 
 pub type Message {
   New(
@@ -23,9 +22,13 @@ pub type Message {
 pub type Name =
   process.Name(Message)
 
+type PlayerInstance {
+  PlayerInstance(name: String, subject: process.Subject(player.Message))
+}
+
 type State {
   State(
-    players: dict.Dict(uuid.Uuid, process.Subject(player.Message)),
+    players: dict.Dict(uuid.Uuid, PlayerInstance),
     player_factory: factory_supervisor.Supervisor(
       uuid.Uuid,
       #(process.Subject(player.Message), profile.Profile),
@@ -68,7 +71,9 @@ fn message_handler(state: State, message: Message) -> actor.Next(State, Message)
       case factory_supervisor.start_child(player_factory, uuid) {
         Ok(actor.Started(_pid, data)) -> {
           process.send(return_subject, Ok(data))
-          let players = dict.insert(players, uuid, pair.first(data))
+          let #(player_subject, profile.Profile(id:, name:, ..)) = data
+          let player_instance = PlayerInstance(name, player_subject)
+          let players = dict.insert(players, id, player_instance)
           State(..state, players:)
         }
         Error(actor_error) -> {

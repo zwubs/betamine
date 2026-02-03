@@ -8,10 +8,6 @@ pub opaque type Uuid {
   Uuid(value: BitArray)
 }
 
-pub fn new() {
-  uuid.v4()
-}
-
 pub const default = Uuid(<<0x40008000000000000000:size(128)>>)
 
 fn from_string_decoder() {
