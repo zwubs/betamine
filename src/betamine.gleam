@@ -8,8 +8,11 @@ import gleam/int
 import gleam/io
 import gleam/otp/static_supervisor
 import glisten
+import logging
 
 pub fn main() {
+  logging.configure()
+
   let world_name = process.new_name("world")
   let world = world.supervised(world_name)
 
