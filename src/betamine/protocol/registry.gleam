@@ -1,7 +1,7 @@
 import betamine/protocol/packets/clientbound
 import gleam/list
 import gleam/option
-import nbeet
+import nbeet/nbt
 
 const damage_types = [
   "arrow",
@@ -72,29 +72,29 @@ fn registries() {
       #(
         "overworld",
         option.Some(
-          nbeet.root([
-            #("ambient_light", nbeet.float(0.0)),
-            #("coordinate_scale", nbeet.double(1.0)),
-            #("has_ceiling", nbeet.byte(0)),
-            #("has_skylight", nbeet.byte(1)),
-            #("height", nbeet.int(384)),
-            #("logical_height", nbeet.int(384)),
-            #("infiniburn", nbeet.string("#minecraft:infiniburn_overworld")),
-            #("min_y", nbeet.int(-64)),
-            #("monster_spawn_block_light_limit", nbeet.int(0)),
+          nbt.root([
+            #("ambient_light", nbt.float(0.0)),
+            #("coordinate_scale", nbt.double(1.0)),
+            #("has_ceiling", nbt.bool(False)),
+            #("has_skylight", nbt.bool(True)),
+            #("height", nbt.int(384)),
+            #("logical_height", nbt.int(384)),
+            #("infiniburn", nbt.string("#minecraft:infiniburn_overworld")),
+            #("min_y", nbt.int(-64)),
+            #("monster_spawn_block_light_limit", nbt.int(0)),
             #(
               "monster_spawn_light_level",
-              nbeet.compound([
-                #("type", nbeet.string("minecraft:uniform")),
-                #("max_inclusive", nbeet.int(7)),
-                #("min_inclusive", nbeet.int(0)),
+              nbt.compound([
+                #("type", nbt.string("minecraft:uniform")),
+                #("max_inclusive", nbt.int(7)),
+                #("min_inclusive", nbt.int(0)),
               ]),
             ),
             #(
               "attributes",
-              nbeet.compound([
-                #("minecraft:visual/fog_color", nbeet.string("#c0d8ff")),
-                #("minecraft:visual/sky_color", nbeet.string("#78a7ff")),
+              nbt.compound([
+                #("minecraft:visual/fog_color", nbt.string("#c0d8ff")),
+                #("minecraft:visual/sky_color", nbt.string("#78a7ff")),
               ]),
             ),
           ]),
@@ -115,10 +115,7 @@ pub fn get_packets() {
       list.map(registry.1, fn(entry) {
         clientbound.RegistryEntry(
           #("minecraft", entry.0),
-          option.map(entry.1, fn(nbt) {
-            let assert Ok(nbt) = nbeet.java_network_encode(nbt)
-            nbt
-          }),
+          option.map(entry.1, nbt.java_network_encode),
         )
       }),
     ))

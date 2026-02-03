@@ -10,7 +10,7 @@ import gleam/json
 import gleam/list
 import gleam/option.{type Option, None, Some}
 import gleam/string
-import nbeet
+import nbeet/nbt
 
 pub fn bool(tree: BytesTree, bool: Bool) -> BytesTree {
   case bool {
@@ -149,8 +149,13 @@ pub fn block_state(tree: BytesTree, block_state: block_state.BlockState) {
   tree |> var_int(block_state.to_int(block_state))
 }
 
-pub fn nbt(tree: BytesTree, nbt: nbeet.Nbt) {
-  let assert Ok(bit_array) = nbeet.java_network_encode(nbt)
+pub fn nbt(tree: BytesTree, nbt: nbt.Nbt) {
+  let bit_array = nbt.java_network_encode(nbt)
+  bytes_tree.append(tree, bit_array)
+}
+
+pub fn nbt_tag(tree: BytesTree, tag: nbt.Tag) {
+  let bit_array = nbt.encode_tag(tag)
   bytes_tree.append(tree, bit_array)
 }
 
