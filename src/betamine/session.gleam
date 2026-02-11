@@ -1,31 +1,50 @@
+import betamine/common/chunk_position
+import betamine/common/difficulty
+import betamine/common/math/vector3
+import betamine/common/rotation
 import betamine/common/text_component
 import betamine/constant
 import betamine/player/player
 import betamine/player/player_manager
 import betamine/protocol
+import betamine/protocol/common/chunk
+import betamine/protocol/common/game_event
 import betamine/protocol/error
 import betamine/protocol/packets/clientbound
 import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
+import betamine/protocol/registry
 import gleam/erlang/process
 import gleam/list
 import gleam/option
 import gleam/otp/actor
 import gleam/result
+import gleam/set
 import gleam/string
 import glisten
 import glisten/socket
 import logging
 
-pub type Clientbound
+pub type Clientbound {
+  KeepAlive
+  LoadedChunk(chunk.Chunk)
+  MoveEntity(
+    id: Int,
+    position_delta: option.Option(vector3.Vector3(Float)),
+    rotation: option.Option(rotation.Rotation),
+    on_ground: Bool,
+  )
+}
 
 pub type State {
   State(
+    subject: process.Subject(Clientbound),
     phase: phase.Phase,
-    last_keep_alive: Int,
     ip_address: String,
+    keep_alive_timer: process.Timer,
     player_subject: option.Option(process.Subject(player.Message)),
     player_manager_subject: process.Subject(player_manager.Message),
+    chunk_subject: process.Subject(chunk.Chunk),
   )
 }
 
@@ -39,26 +58,28 @@ pub fn init(
 
   let player_manager_subject = process.named_subject(player_manager_name)
 
-  let self = process.new_subject()
+  let subject = process.new_subject()
+  let keep_alive_timer = process.send_after(subject, 15_000, KeepAlive)
+  let chunk_subject: process.Subject(chunk.Chunk) = process.new_subject()
 
   let state =
     State(
+      subject:,
       phase: phase.Handshaking,
-      last_keep_alive: now_seconds(),
       player_subject: option.None,
+      keep_alive_timer:,
       ip_address:,
       player_manager_subject:,
+      chunk_subject:,
     )
 
   let selector =
     process.new_selector()
-    |> process.select(self)
+    |> process.select(subject)
+    |> process.select_map(chunk_subject, LoadedChunk)
 
   #(state, option.Some(selector))
 }
-
-@external(erlang, "betamine_ffi", "now_seconds")
-pub fn now_seconds() -> Int
 
 pub fn close(state: State) {
   logging.log(logging.Debug, "Closing connection w/ " <> state.ip_address)
@@ -83,8 +104,19 @@ pub fn loop(
         }
       }
     }
-    glisten.User(clientbound) ->
-      handle_clientbound(state, clientbound, connection)
+    glisten.User(clientbound) -> {
+      case handle_clientbound(state, clientbound, connection) {
+        Ok(state) -> glisten.continue(state)
+        Error(error) -> {
+          let reason = string.inspect(error)
+          echo "Disconnecting: " <> reason
+          let _ = send_disconnect(connection, state.phase, reason)
+          // Ensure enough time for the disconnect to send
+          process.sleep(100)
+          glisten.stop_abnormal(reason)
+        }
+      }
+    }
   }
 }
 
@@ -192,12 +224,118 @@ fn handle_packet(
           )
           Ok(state)
         }
+        serverbound.Plugin(_) -> {
+          use _ <- result.try(send_packet(
+            connection,
+            clientbound.default_plugin(),
+          ))
+          Ok(state)
+        }
+        serverbound.KnownDataPacks(_) -> {
+          use _ <- result.try(send_packets(connection, registry.get_packets()))
+          use _ <- result.try(send_packet(
+            connection,
+            clientbound.FinishConfiguration,
+          ))
+          Ok(state)
+        }
+        serverbound.AcknowledgeFinishConfiguration -> {
+          let phase = phase.Play
+          use #(profile, _, entity) <- result.try(call_player(
+            state.player_subject,
+            1000,
+            player.GetSpawnInformation,
+          ))
+
+          use _ <- result.try(send_player_message(
+            state.player_subject,
+            player.LoadChunks(state.chunk_subject),
+          ))
+
+          use _ <- result.try(
+            send_packets(connection, [
+              clientbound.Login(
+                clientbound.LoginPacket(
+                  ..clientbound.default_login,
+                  entity_id: entity.id,
+                ),
+              ),
+              clientbound.ChangeDifficulty(clientbound.ChangeDifficultyPacket(
+                difficulty: difficulty.Easy,
+                locked: False,
+              )),
+              clientbound.GameEvent(clientbound.GameEventPacket(
+                game_event.WaitForChunks,
+              )),
+              clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(
+                chunk_position.default,
+              )),
+              clientbound.SynchronizePlayerPosition(
+                clientbound.SynchronizePlayerPositionPacket(
+                  0,
+                  entity.position,
+                  entity.velocity,
+                  entity.rotation,
+                  0,
+                ),
+              ),
+              // Is this packet needed?
+              clientbound.PlayerInfoUpdate(
+                clientbound.PlayerInfoUpdatePacket(
+                  actions: set.from_list([
+                    clientbound.AddPlayer,
+                    clientbound.UpdateListed,
+                    clientbound.UpdateHat,
+                  ]),
+                  entries: [
+                    clientbound.PlayerInfoUpdateEntry(
+                      uuid: profile.id,
+                      name: profile.name,
+                      latency: 0,
+                      visible_on_player_list: True,
+                      profile: profile,
+                      game_mode: constant.mc_player_game_mode,
+                      chat_session: option.None,
+                      display_name: option.Some(profile.name),
+                      hat_visible: True,
+                    ),
+                  ],
+                ),
+              ),
+            ]),
+          )
+          Ok(State(..state, phase:))
+        }
         _ -> Error(InvalidPacket(state.phase, packet))
       }
     }
     phase.Play -> {
       case packet {
-        _ -> Error(InvalidPacket(state.phase, packet))
+        serverbound.ConfirmTeleport(_) -> {
+          Ok(state)
+        }
+        serverbound.PlayerPosition(on_ground:, against_wall:, ..)
+        | serverbound.PlayerPositionAndRotation(on_ground:, against_wall:, ..)
+        | serverbound.PlayerRotation(on_ground:, against_wall:, ..) -> {
+          let position = case packet {
+            serverbound.PlayerPosition(position:, ..)
+            | serverbound.PlayerPositionAndRotation(position:, ..) ->
+              option.Some(position)
+            _ -> option.None
+          }
+          let rotation = case packet {
+            serverbound.PlayerRotation(rotation:, ..)
+            | serverbound.PlayerPositionAndRotation(rotation:, ..) ->
+              option.Some(rotation)
+            _ -> option.None
+          }
+          use _ <- result.try(send_player_message(
+            state.player_subject,
+            player.Move(position:, rotation:, on_ground:, against_wall:),
+          ))
+          Ok(state)
+        }
+        _ -> Ok(state)
       }
     }
   }
@@ -209,6 +347,18 @@ fn send_player_message(
 ) {
   case subject {
     option.Some(player_subject) -> Ok(process.send(player_subject, message))
+    option.None -> Error(PlayerNotFound)
+  }
+}
+
+fn call_player(
+  player_subject: option.Option(process.Subject(player.Message)),
+  timeout: Int,
+  make_request: fn(process.Subject(reply)) -> player.Message,
+) {
+  case player_subject {
+    option.Some(player_subject) ->
+      Ok(process.call(player_subject, timeout, make_request))
     option.None -> Error(PlayerNotFound)
   }
 }
@@ -240,12 +390,81 @@ fn send_disconnect(
   send_packets(connection, packets)
 }
 
-pub fn handle_clientbound(
+fn handle_clientbound(
   state: State,
   clientbound: Clientbound,
   connection: glisten.Connection(Clientbound),
 ) {
-  todo
+  case clientbound {
+    LoadedChunk(chunk) -> {
+      use _ <- result.try(send_packet(
+        connection,
+        clientbound.LevelChunkWithLight(
+          clientbound.LevelChunkWithLightPacket(
+            ..clientbound.default_level_chunk_with_light_packet(),
+            chunk:,
+          ),
+        ),
+      ))
+      Ok(state)
+    }
+    KeepAlive -> {
+      use _ <- result.try(send_keep_alive(connection, state.phase))
+      let keep_alive_timer =
+        process.send_after(state.subject, 15_000, KeepAlive)
+      Ok(State(..state, keep_alive_timer:))
+    }
+    MoveEntity(id:, position_delta:, rotation:, on_ground:) -> {
+      case position_delta, rotation {
+        option.Some(delta), option.Some(rotation) -> {
+          let packet =
+            clientbound.MoveEntityPositionRotationPacket(
+              id,
+              delta,
+              rotation,
+              on_ground,
+            )
+          send_packet(
+            connection,
+            clientbound.MoveEntityPositionRotation(packet),
+          )
+        }
+        option.Some(delta), option.None -> {
+          let packet =
+            clientbound.MoveEntityPositionPacket(id, delta, on_ground)
+          send_packet(connection, clientbound.MoveEntityPosition(packet))
+        }
+        option.None, option.Some(rotation) -> {
+          let packet =
+            clientbound.MoveEntityRotationPacket(id, rotation, on_ground)
+          send_packet(connection, clientbound.MoveEntityRotation(packet))
+        }
+        option.None, option.None -> Ok(Nil)
+      }
+      |> result.replace(state)
+    }
+  }
+}
+
+fn send_keep_alive(
+  connection: glisten.Connection(Clientbound),
+  phase: phase.Phase,
+) {
+  case phase {
+    phase.Configuration -> {
+      send_packet(
+        connection,
+        clientbound.ConfigurationKeepAlive(clientbound.KeepAlivePacket(0)),
+      )
+    }
+    phase.Play -> {
+      send_packet(
+        connection,
+        clientbound.PlayKeepAlive(clientbound.KeepAlivePacket(0)),
+      )
+    }
+    _ -> Ok(Nil)
+  }
 }
 
 fn send_packet(

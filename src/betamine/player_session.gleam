@@ -312,7 +312,6 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
             clientbound.LevelChunkWithLight(
               clientbound.LevelChunkWithLightPacket(
                 ..clientbound.default_level_chunk_with_light_packet(),
-                position:,
                 chunk:,
               ),
             ),
@@ -371,7 +370,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
     serverbound.ConfirmTeleport(_) -> {
       Ok(State(..state, ignore_position_packets: False))
     }
-    serverbound.PlayerPosition(packet) -> {
+    serverbound.PlayerPosition(..) as packet -> {
       use <- bool.guard(state.ignore_position_packets, Ok(state))
       process.send(
         state.game_subject,
@@ -379,7 +378,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       handle_player_move(state, packet.position)
     }
-    serverbound.PlayerPositionAndRotation(packet) -> {
+    serverbound.PlayerPositionAndRotation(..) as packet -> {
       process.send(
         state.game_subject,
         message.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
@@ -391,7 +390,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
       )
       handle_player_move(state, packet.position)
     }
-    serverbound.PlayerRotation(packet) -> {
+    serverbound.PlayerRotation(..) as packet -> {
       process.send(
         state.game_subject,
         message.RotatePlayer(state.uuid, packet.rotation, packet.on_ground),
@@ -523,7 +522,6 @@ fn handle_player_move(
         clientbound.LevelChunkWithLight(
           clientbound.LevelChunkWithLightPacket(
             ..clientbound.default_level_chunk_with_light_packet(),
-            position: chunk_position,
             chunk:,
           ),
         ),

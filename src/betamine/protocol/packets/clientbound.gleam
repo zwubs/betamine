@@ -52,8 +52,9 @@ pub type Packet {
   PlayerInfoUpdate(packet: PlayerInfoUpdatePacket)
   SynchronizePlayerPosition(packet: SynchronizePlayerPositionPacket)
   SpawnEntity(packet: SpawnEntityPacket)
-  UpdateEntityPosition(packet: UpdateEntityPositionPacket)
-  UpdateEntityRotation(packet: UpdateEntityRotationPacket)
+  MoveEntityPosition(packet: MoveEntityPositionPacket)
+  MoveEntityPositionRotation(packet: MoveEntityPositionRotationPacket)
+  MoveEntityRotation(packet: MoveEntityRotationPacket)
   SetHeadRotation(packet: SetHeadRotationPacket)
   RemoveEntities(packet: RemoveEntitiesPacket)
   PlayKeepAlive(packet: KeepAlivePacket)
@@ -91,8 +92,9 @@ fn get_packet_id(packet: Packet) -> Int {
     PlayerInfoUpdate(..) -> 68
     SynchronizePlayerPosition(..) -> 70
     SpawnEntity(..) -> 1
-    UpdateEntityPosition(..) -> 51
-    UpdateEntityRotation(..) -> 54
+    MoveEntityPosition(..) -> 51
+    MoveEntityPositionRotation(..) -> 52
+    MoveEntityRotation(..) -> 54
     SetHeadRotation(..) -> 81
     RemoveEntities(..) -> 75
     PlayKeepAlive(..) -> 43
@@ -131,8 +133,12 @@ pub fn encode(packet: Packet) -> BytesTree {
       packet,
     )
     SpawnEntity(packet) -> encode_spawn_entity(_, packet)
-    UpdateEntityPosition(packet) -> encode_update_entity_position(_, packet)
-    UpdateEntityRotation(packet) -> encode_update_entity_rotation(_, packet)
+    MoveEntityPosition(packet) -> encode_move_entity_position(_, packet)
+    MoveEntityPositionRotation(packet) -> encode_move_entity_position_rotation(
+      _,
+      packet,
+    )
+    MoveEntityRotation(packet) -> encode_move_entity_rotation(_, packet)
     SetHeadRotation(packet) -> encode_set_head_rotation(_, packet)
     RemoveEntities(packet) -> encode_remove_entities(_, packet)
     PlayKeepAlive(packet) | ConfigurationKeepAlive(packet) -> encode_keep_alive(
@@ -223,6 +229,13 @@ fn encode_login_success(tree: BytesTree, packet: LoginSuccessPacket) {
 
 pub type PluginPacket {
   PluginPacket(channel: identifier.Identifier, implementation: BitArray)
+}
+
+pub fn default_plugin() {
+  Plugin(PluginPacket(
+    #("minecraft", "brand"),
+    encoder.string(bytes_tree.new(), "betamine") |> bytes_tree.to_bit_array(),
+  ))
 }
 
 pub fn encode_plugin(tree: BytesTree, packet: PluginPacket) {
@@ -458,8 +471,6 @@ fn encode_set_center_chunk(tree: BytesTree, packet: SetCenterChunkPacket) {
 
 pub type LevelChunkWithLightPacket {
   LevelChunkWithLightPacket(
-    position: chunk_position.ChunkPosition,
-    heightmaps: List(Nil),
     chunk: chunk.Chunk,
     block_entities: List(Nil),
     sky_light_mask: List(Int),
@@ -475,8 +486,6 @@ pub fn default_level_chunk_with_light_packet() {
   let sky_light_array = list.range(1, 2048) |> list.map(fn(_) { 0xFF })
   let block_light_array = sky_light_array |> list.map(fn(_) { 0x0 })
   LevelChunkWithLightPacket(
-    position: chunk_position.default,
-    heightmaps: [],
     chunk: chunk.default(),
     block_entities: [],
     sky_light_mask: [0b11111111111111111111111111],
@@ -498,9 +507,6 @@ fn encode_level_chunk_with_light(
   packet: LevelChunkWithLightPacket,
 ) {
   tree
-  |> encoder.int(packet.position.x)
-  |> encoder.int(packet.position.z)
-  |> encoder.array(packet.heightmaps, fn(_, _) { todo as "Encode heightmaps" })
   |> chunk.encode(packet.chunk)
   |> encoder.array(packet.block_entities, fn(_, _) {
     todo as "Encode block entities"
@@ -680,38 +686,58 @@ fn encode_spawn_entity(tree: BytesTree, packet: SpawnEntityPacket) {
   |> encoder.var_int(0)
 }
 
-pub type UpdateEntityPositionPacket {
-  UpdateEntityPositionPacket(id: Int, delta: Vector3(Float), is_grounded: Bool)
+pub type MoveEntityPositionPacket {
+  MoveEntityPositionPacket(id: Int, delta: Vector3(Float), on_ground: Bool)
 }
 
-fn encode_update_entity_position(
+fn encode_move_entity_position(
   tree: BytesTree,
-  packet: UpdateEntityPositionPacket,
+  packet: MoveEntityPositionPacket,
 ) {
   tree
   |> encoder.var_int(packet.id)
   |> common.encode_delta(packet.delta)
-  |> encoder.bool(packet.is_grounded)
+  |> encoder.bool(packet.on_ground)
 }
 
-pub type UpdateEntityRotationPacket {
-  UpdateEntityRotationPacket(
+pub type MoveEntityPositionRotationPacket {
+  MoveEntityPositionRotationPacket(
     id: Int,
-    yaw: Float,
-    pitch: Float,
-    is_grounded: Bool,
+    delta: Vector3(Float),
+    rotation: rotation.Rotation,
+    on_ground: Bool,
   )
 }
 
-fn encode_update_entity_rotation(
+fn encode_move_entity_position_rotation(
   tree: BytesTree,
-  packet: UpdateEntityRotationPacket,
+  packet: MoveEntityPositionRotationPacket,
+) -> BytesTree {
+  tree
+  |> encoder.var_int(packet.id)
+  |> common.encode_delta(packet.delta)
+  |> encoder.angle(packet.rotation.yaw)
+  |> encoder.angle(packet.rotation.pitch)
+  |> encoder.bool(packet.on_ground)
+}
+
+pub type MoveEntityRotationPacket {
+  MoveEntityRotationPacket(
+    id: Int,
+    rotation: rotation.Rotation,
+    on_ground: Bool,
+  )
+}
+
+fn encode_move_entity_rotation(
+  tree: BytesTree,
+  packet: MoveEntityRotationPacket,
 ) {
   tree
   |> encoder.var_int(packet.id)
-  |> encoder.angle(packet.yaw)
-  |> encoder.angle(packet.pitch)
-  |> encoder.bool(packet.is_grounded)
+  |> encoder.angle(packet.rotation.yaw)
+  |> encoder.angle(packet.rotation.pitch)
+  |> encoder.bool(packet.on_ground)
 }
 
 pub type SetHeadRotationPacket {

@@ -1,6 +1,7 @@
 import betamine/common/profile
 import betamine/common/uuid
 import betamine/player/player
+import gleam/bool
 import gleam/dict
 import gleam/erlang/process
 import gleam/list
@@ -20,6 +21,8 @@ pub type Message {
     uuid: uuid.Uuid,
   )
   GetAll(return_subject: process.Subject(List(#(uuid.Uuid, String))))
+  /// A temporary message allowing players to communicate with eachother.
+  SendOthers(from: uuid.Uuid, message: player.Message)
 }
 
 pub type Name =
@@ -90,6 +93,14 @@ fn message_handler(state: State, message: Message) -> actor.Next(State, Message)
         dict.to_list(state.players)
         |> list.map(pair.map_second(_, fn(instance) { instance.name }))
       process.send(return_subject, players)
+      state
+    }
+    SendOthers(from:, message:) -> {
+      let _ =
+        dict.each(state.players, fn(uuid, player) {
+          use <- bool.guard(from == uuid, Nil)
+          process.send(player.subject, message)
+        })
       state
     }
   }

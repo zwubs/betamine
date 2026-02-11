@@ -1,3 +1,5 @@
+import betamine/common/block/block_property
+import betamine/common/block/block_state
 import betamine/constant
 import betamine/game
 import betamine/player/player_supervisor
@@ -21,7 +23,11 @@ pub fn main() {
   let player_factory_name = process.new_name("player_factory")
   let player_manager_name = process.new_name("player_manager")
   let player_supervisor =
-    player_supervisor.supervised(player_factory_name, player_manager_name)
+    player_supervisor.supervised(
+      player_factory_name,
+      player_manager_name,
+      world_name,
+    )
 
   let http_server =
     glisten.new(session.init(_, player_manager_name), session.loop)

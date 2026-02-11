@@ -49,7 +49,7 @@ pub fn generate_chunk(
     |> list.prepend(chunk_sections, _)
   })
   |> list.reverse
-  |> chunk.Chunk()
+  |> chunk.Chunk(position, [], _)
 }
 
 pub fn generate_chunk_section(

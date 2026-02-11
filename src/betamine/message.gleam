@@ -60,9 +60,6 @@ pub type GameMessage {
 
 pub type WorldMessage {
   GenerateSpawnChunks
-  GetAllChunks(
-    subject: process.Subject(List(#(chunk_position.ChunkPosition, chunk.Chunk))),
-  )
   GetChunk(
     subject: process.Subject(chunk.Chunk),
     chunk_position: chunk_position.ChunkPosition,

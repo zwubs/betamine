@@ -11,7 +11,7 @@ import betamine/common/rotation.{type Rotation, Rotation}
 import betamine/common/uuid
 import betamine/protocol/common
 import betamine/protocol/decoder
-import betamine/protocol/error.{InvalidPacket, UnhandledPacket}
+import betamine/protocol/error
 import betamine/protocol/phase
 import gleam/result
 
@@ -29,9 +29,14 @@ pub type Packet {
   ClientTickEnd
   Interact(InteractPacket)
   KeepAlive(KeepAlivePacket)
-  PlayerPosition(PlayerPositionPacket)
-  PlayerPositionAndRotation(PlayerPositionAndRotationPacket)
-  PlayerRotation(PlayerRotationPacket)
+  PlayerPosition(position: Vector3(Float), on_ground: Bool, against_wall: Bool)
+  PlayerPositionAndRotation(
+    position: Vector3(Float),
+    rotation: Rotation,
+    on_ground: Bool,
+    against_wall: Bool,
+  )
+  PlayerRotation(rotation: Rotation, on_ground: Bool, against_wall: Bool)
   PlayerCommand(PlayerCommandPacket)
   PlayerInput(PlayerInputPacket)
   PlayerLoaded
@@ -47,22 +52,22 @@ pub fn decode(
     phase.Handshaking -> {
       case id {
         0 -> decode_handshake(data)
-        _ -> Error(InvalidPacket(phase, id))
+        _ -> Error(error.InvalidPacket)
       }
     }
     phase.Status -> {
       case id {
         0 -> Ok(StatusRequest)
         1 -> decode_ping(data, StatusPing)
-        _ -> Error(InvalidPacket(phase, id))
+        _ -> Error(error.InvalidPacket)
       }
     }
     phase.Login -> {
       case id {
         0 -> decode_login_start(data)
         3 -> Ok(LoginAcknowledged)
-        id if id <= 4 -> Error(UnhandledPacket(phase, id))
-        _ -> Error(InvalidPacket(phase, id))
+        id if id <= 4 -> Error(error.UnhandledPacket)
+        _ -> Error(error.InvalidPacket)
       }
     }
     phase.Configuration -> {
@@ -74,8 +79,8 @@ pub fn decode(
           decode_known_data_packs(data)
           |> result.map(KnownDataPacks)
         }
-        id if id <= 7 -> Error(UnhandledPacket(phase, id))
-        _ -> Error(InvalidPacket(phase, id))
+        id if id <= 7 -> Error(error.UnhandledPacket)
+        _ -> Error(error.InvalidPacket)
       }
     }
     phase.Play -> {
@@ -92,11 +97,12 @@ pub fn decode(
         42 -> decode_player_input(data)
         43 -> Ok(PlayerLoaded)
         60 -> decode_swing_arm(data)
-        id if id <= 63 -> Error(UnhandledPacket(phase, id))
-        _ -> Error(InvalidPacket(phase, id))
+        id if id <= 63 -> Error(error.UnhandledPacket)
+        _ -> Error(error.InvalidPacket)
       }
     }
   }
+  |> result.map_error(error.DecodeError(phase, id, _))
 }
 
 pub type HandshakePacket {
@@ -244,8 +250,25 @@ pub fn decode_keep_alive(data: BitArray) {
   Ok(KeepAlive(KeepAlivePacket(id)))
 }
 
+type PlayerMovementFlags {
+  PlayerMovementFlags(on_ground: Bool, against_wall: Bool)
+}
+
+fn decode_player_movement_flags(data: BitArray) {
+  use #(flags, _) <- result.try(decoder.bytes_of_length(data, 1))
+  case flags {
+    <<_:6-int, on_ground:1-int, against_wall:1-int>> ->
+      Ok(#(PlayerMovementFlags(on_ground == 1, against_wall == 1), data))
+    _ -> Error(error.EndOfData)
+  }
+}
+
 pub type PlayerPositionPacket {
-  PlayerPositionPacket(position: Vector3(Float), on_ground: Bool)
+  PlayerPositionPacket(
+    position: Vector3(Float),
+    on_ground: Bool,
+    against_wall: Bool,
+  )
 }
 
 pub fn decode_player_position(data: BitArray) {
@@ -253,8 +276,8 @@ pub fn decode_player_position(data: BitArray) {
   use #(y, data) <- result.try(decoder.double(data))
   use #(z, data) <- result.try(decoder.double(data))
   let position = Vector3(x, y, z)
-  use #(on_ground, _) <- result.try(decoder.boolean(data))
-  Ok(PlayerPosition(PlayerPositionPacket(position, on_ground)))
+  use #(flags, _) <- result.try(decode_player_movement_flags(data))
+  Ok(PlayerPosition(position, flags.on_ground, flags.against_wall))
 }
 
 pub type PlayerPositionAndRotationPacket {
@@ -262,6 +285,7 @@ pub type PlayerPositionAndRotationPacket {
     position: Vector3(Float),
     rotation: Rotation,
     on_ground: Bool,
+    against_wall: Bool,
   )
 }
 
@@ -273,26 +297,25 @@ pub fn decode_player_position_and_rotation(data: BitArray) {
   use #(yaw, data) <- result.try(decoder.float(data))
   use #(pitch, data) <- result.try(decoder.float(data))
   let rotation = Rotation(pitch, yaw)
-  use #(on_ground, _) <- result.try(decoder.boolean(data))
-  Ok(
-    PlayerPositionAndRotation(PlayerPositionAndRotationPacket(
-      position,
-      rotation,
-      on_ground,
-    )),
-  )
+  use #(flags, _) <- result.try(decode_player_movement_flags(data))
+  Ok(PlayerPositionAndRotation(
+    position,
+    rotation,
+    flags.on_ground,
+    flags.against_wall,
+  ))
 }
 
 pub type PlayerRotationPacket {
-  PlayerRotationPacket(rotation: Rotation, on_ground: Bool)
+  PlayerRotationPacket(rotation: Rotation, on_ground: Bool, against_wall: Bool)
 }
 
 pub fn decode_player_rotation(data: BitArray) {
   use #(yaw, data) <- result.try(decoder.float(data))
   use #(pitch, data) <- result.try(decoder.float(data))
   let rotation = Rotation(pitch, yaw)
-  use #(on_ground, _) <- result.try(decoder.boolean(data))
-  Ok(PlayerRotation(PlayerRotationPacket(rotation, on_ground)))
+  use #(flags, _) <- result.try(decode_player_movement_flags(data))
+  Ok(PlayerRotation(rotation, flags.on_ground, flags.against_wall))
 }
 
 pub type PlayerCommandPacket {

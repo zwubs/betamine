@@ -1,10 +1,10 @@
-import betamine/protocol/error.{type ProtocolError}
+import betamine/protocol/error.{type DecodeError}
 import gleam/bit_array
 import gleam/int
 import gleam/result.{map, try}
 
 type DecodeResult(value) =
-  Result(#(value, BitArray), ProtocolError)
+  Result(#(value, BitArray), DecodeError)
 
 @external(erlang, "erlang", "bit_size")
 pub fn bit_size(x: BitArray) -> Int
@@ -117,7 +117,7 @@ pub fn boolean(bit_array: BitArray) {
       case bool {
         0 -> Ok(#(False, bit_array))
         1 -> Ok(#(True, bit_array))
-        _ -> Error(error.InvalidBoolean)
+        _ -> Error(error.InvalidBoolean(bool))
       }
     }
     _ -> Error(error.EndOfData)
@@ -138,26 +138,26 @@ pub fn double(bit_array: BitArray) {
   }
 }
 
-type DecodeArrayResult(value, error) =
-  Result(#(List(value), BitArray), error)
+type DecodeArrayResult(value) =
+  Result(#(List(value), BitArray), DecodeError)
 
-type ArrayParser(value, error) =
-  fn(BitArray) -> Result(#(value, BitArray), error)
+type ArrayParser(value) =
+  fn(BitArray) -> Result(#(value, BitArray), DecodeError)
 
 pub fn array(
   bit_array: BitArray,
-  parser: ArrayParser(value, ProtocolError),
+  parser: ArrayParser(value),
   length: Int,
-) -> DecodeArrayResult(value, ProtocolError) {
+) -> DecodeArrayResult(value) {
   array_elements(bit_array, parser, [], length)
 }
 
 fn array_elements(
   bit_array: BitArray,
-  parser: ArrayParser(value, ProtocolError),
+  parser: ArrayParser(value),
   values: List(value),
   length: Int,
-) -> DecodeArrayResult(value, ProtocolError) {
+) -> DecodeArrayResult(value) {
   case length {
     l if l < 1 -> Ok(#(values, bit_array))
     _ -> {

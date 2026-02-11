@@ -16,20 +16,19 @@ pub fn handle_spawn(entity: Entity) -> Packet {
 }
 
 pub fn handle_move(id, delta, on_ground) {
-  clientbound.UpdateEntityPosition(clientbound.UpdateEntityPositionPacket(
+  clientbound.MoveEntityPosition(clientbound.MoveEntityPositionPacket(
     id:,
     delta:,
-    is_grounded: on_ground,
+    on_ground:,
   ))
 }
 
 pub fn handle_rotate(id, rotation: rotation.Rotation, on_ground) {
   [
-    clientbound.UpdateEntityRotation(clientbound.UpdateEntityRotationPacket(
+    clientbound.MoveEntityRotation(clientbound.MoveEntityRotationPacket(
       id:,
-      pitch: rotation.pitch,
-      yaw: rotation.yaw,
-      is_grounded: on_ground,
+      rotation:,
+      on_ground:,
     )),
     clientbound.SetHeadRotation(clientbound.SetHeadRotationPacket(
       id:,

@@ -60,6 +60,18 @@ pub const empty = ChunkSection(
   biomes: PalettedContainer(paletted_container.SingleValuedPalette(0), []),
 )
 
+pub fn encode_list(
+  tree: bytes_tree.BytesTree,
+  chunk_sections: List(ChunkSection),
+) {
+  let data =
+    bytes_tree.new()
+    |> encoder.raw_array(chunk_sections, encode)
+  tree
+  |> encoder.var_int(bytes_tree.byte_size(data))
+  |> bytes_tree.append_tree(data)
+}
+
 pub fn encode(tree: BytesTree, chunk_section: ChunkSection) {
   tree
   |> encoder.short(chunk_section.block_count)

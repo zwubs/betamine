@@ -1,7 +1,7 @@
 import betamine/common/block/block_state
+import betamine/common/block_position
 import betamine/common/chunk_position
 import betamine/constant
-import betamine/message
 import betamine/protocol/common/chunk
 import betamine/world/generation
 import gleam/dict
@@ -11,10 +11,24 @@ import gleam/otp/actor
 import gleam/otp/supervision
 import gleam/set
 
-type Message =
-  message.WorldMessage
+pub type Message {
+  GenerateSpawnChunks
+  GetChunk(
+    return_subject: process.Subject(chunk.Chunk),
+    chunk_position: chunk_position.ChunkPosition,
+  )
+  GetBlock(
+    subject: process.Subject(Result(block_state.BlockState, Nil)),
+    block_position: block_position.BlockPosition,
+  )
+  PlaceBlock(
+    subject: process.Subject(Result(block_state.BlockState, Nil)),
+    block_position: block_position.BlockPosition,
+    state: block_state.BlockState,
+  )
+}
 
-type Name =
+pub type Name =
   process.Name(Message)
 
 type World {
@@ -50,7 +64,7 @@ pub fn start(
 
 fn loop(world: World, message: Message) -> actor.Next(World, Message) {
   case message {
-    message.GenerateSpawnChunks -> {
+    GenerateSpawnChunks -> {
       let chunk_range =
         list.range({ constant.mc_view_distance + 1 } * -1, {
           constant.mc_view_distance + 1
@@ -69,26 +83,22 @@ fn loop(world: World, message: Message) -> actor.Next(World, Message) {
         })
       actor.continue(World(..world, chunks:))
     }
-    message.GetAllChunks(subject:) -> {
-      process.send(subject, dict.to_list(world.chunks))
-      actor.continue(world)
-    }
-    message.GetChunk(subject:, chunk_position:) -> {
+    GetChunk(return_subject:, chunk_position:) -> {
       case dict.get(world.chunks, chunk_position) {
         Ok(chunk) -> {
-          process.send(subject, chunk)
+          process.send(return_subject, chunk)
           actor.continue(world)
         }
         _ -> {
           let chunk =
             generation.generate_chunk(chunk_position, world.generation_options)
-          process.send(subject, chunk)
+          process.send(return_subject, chunk)
           let chunks = dict.insert(world.chunks, chunk_position, chunk)
           actor.continue(World(..world, chunks:))
         }
       }
     }
-    message.GetBlock(subject:, block_position:) -> {
+    GetBlock(subject:, block_position:) -> {
       let chunk_position = chunk_position.from_block_position(block_position)
       case dict.get(world.chunks, chunk_position) {
         Ok(_) -> Ok(block_state.air)
@@ -97,6 +107,6 @@ fn loop(world: World, message: Message) -> actor.Next(World, Message) {
       |> process.send(subject, _)
       actor.continue(world)
     }
-    message.PlaceBlock(subject:, block_position:, state:) -> todo
+    PlaceBlock(subject:, block_position:, state:) -> todo
   }
 }
