@@ -5,7 +5,7 @@ import betamine/common/rotation
 import betamine/common/text_component
 import betamine/constant
 import betamine/player/player
-import betamine/player/player_manager
+import betamine/player/manager as player_manager
 import betamine/protocol
 import betamine/protocol/common/chunk
 import betamine/protocol/common/game_event

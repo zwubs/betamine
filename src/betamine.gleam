@@ -2,7 +2,7 @@ import betamine/common/block/block_property
 import betamine/common/block/block_state
 import betamine/constant
 import betamine/game
-import betamine/player/player_supervisor
+import betamine/player/supervisor as player_supervisor
 import betamine/session
 import betamine/world
 import gleam/erlang/process
