@@ -1,7 +1,6 @@
 import betamine/common/profile
 import betamine/common/uuid
 import betamine/player/player
-import betamine/player/player_manager
 import betamine/world
 import gleam/erlang/process
 import gleam/otp/factory_supervisor
@@ -16,19 +15,11 @@ pub type Message =
 pub type Name =
   process.Name(Message)
 
-pub fn supervised(
-  name: Name,
-  manager_name: player_manager.Name,
-  world_name: world.Name,
-) {
-  supervision.supervisor(fn() { start(name, manager_name, world_name) })
+pub fn supervised(name: Name, world_name: world.Name) {
+  supervision.supervisor(fn() { start(name, world_name) })
 }
 
-pub fn start(
-  name: Name,
-  manager_name: player_manager.Name,
-  world_name: world.Name,
-) {
+pub fn start(name: Name, world_name: world.Name) {
   factory_supervisor.worker_child(fn(uuid) { player.start(uuid, world_name) })
   |> factory_supervisor.named(name)
   |> factory_supervisor.start()

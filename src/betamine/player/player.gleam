@@ -8,9 +8,9 @@ import betamine/common/rotation
 import betamine/common/uuid
 import betamine/constant
 import betamine/mojang
-import betamine/player/player_manager
 import betamine/protocol/common/chunk
 import betamine/world
+import gleam/bool
 import gleam/erlang/process
 import gleam/int
 import gleam/list
@@ -48,7 +48,6 @@ pub type State {
 
 pub fn start(
   uuid: uuid.Uuid,
-  manager_name: player_manager.Name,
   world_name: world.Name,
 ) -> Result(
   actor.Started(#(process.Subject(Message), profile.Profile)),
@@ -118,21 +117,21 @@ fn handle_message(state: State, message: Message) -> actor.Next(State, Message) 
       State(..state, loaded_chunks: chunk_positions)
     }
     Move(position:, rotation:, on_ground:, against_wall:) -> {
-      case position, rotation {
-        option.Some(position), option.Some(rotation) -> {
-          todo
-        }
-        option.Some(position), option.None -> {
-          todo
-        }
-        option.None, option.Some(rotation) -> {
-          todo
-        }
-        option.None, option.None -> {
-          todo
-        }
+      case position {
+        option.Some(position) -> handle_move_position(state, position)
+        _ -> state
       }
     }
   }
   |> actor.continue()
+}
+
+fn handle_move_position(state: State, position: position.Position) -> State {
+  let from_chunk = chunk_position.from_position(state.entity.position)
+  let to_chunk = chunk_position.from_position(position)
+
+  let entity = entity.Entity(..state.entity, position:)
+  let state = State(..state, entity:)
+  use <- bool.guard(from_chunk == to_chunk, state)
+  todo
 }
