@@ -1,10 +1,8 @@
-import betamine/common/block/block_property
-import betamine/common/block/block_state
 import betamine/constant
 import betamine/game
 import betamine/player/supervisor as player_supervisor
-import betamine/session
-import betamine/world
+import betamine/session/session
+import betamine/world/world
 import gleam/erlang/process
 import gleam/int
 import gleam/otp/static_supervisor

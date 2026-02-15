@@ -1,6 +1,6 @@
 import betamine/player/factory
 import betamine/player/manager
-import betamine/world
+import betamine/world/world
 import gleam/otp/static_supervisor
 import gleam/otp/supervision
 
