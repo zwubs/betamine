@@ -14,7 +14,10 @@ import betamine/protocol/packets/serverbound
 import betamine/protocol/phase
 import betamine/protocol/registry
 import betamine/session/message
+import gleam/bit_array
+import gleam/bytes_tree
 import gleam/erlang/process
+import gleam/int
 import gleam/list
 import gleam/option
 import gleam/otp/actor
@@ -35,6 +38,7 @@ type Connection =
 
 pub type State {
   State(
+    buffer: BitArray,
     subject: process.Subject(Message),
     player_event_subject: process.Subject(message.PlayerEvent),
     phase: phase.Phase,
@@ -65,6 +69,7 @@ pub fn init(
 
   let state =
     State(
+      buffer: <<>>,
       subject:,
       player_event_subject:,
       phase: phase.Handshaking,
@@ -92,32 +97,23 @@ pub fn loop(
   message: glisten.Message(Message),
   connection: Connection,
 ) -> glisten.Next(State, glisten.Message(Message)) {
-  case message {
-    glisten.Packet(bit_array) -> {
-      case handle_packet(state, bit_array, connection) {
-        Ok(state) -> glisten.continue(state)
-        Error(error) -> {
-          let reason = string.inspect(error)
-          echo "Disconnecting: " <> reason
-          let _ = send_disconnect(connection, state.phase, reason)
-          // Ensure enough time for the disconnect to send
-          process.sleep(100)
-          glisten.stop_abnormal(reason)
-        }
-      }
+  let message_result = case message {
+    glisten.Packet(chunk) -> {
+      let state = State(..state, buffer: bit_array.append(state.buffer, chunk))
+      handle_buffer(state, connection)
     }
-    glisten.User(message) -> {
-      case handle_message(state, message, connection) {
-        Ok(state) -> glisten.continue(state)
-        Error(error) -> {
-          let reason = string.inspect(error)
-          echo "Disconnecting: " <> reason
-          let _ = send_disconnect(connection, state.phase, reason)
-          // Ensure enough time for the disconnect to send
-          process.sleep(100)
-          glisten.stop_abnormal(reason)
-        }
-      }
+    glisten.User(message) -> handle_message(state, message, connection)
+  }
+
+  case message_result {
+    Ok(state) -> glisten.continue(state)
+    Error(error) -> {
+      let reason = string.inspect(error)
+      echo "Disconnecting: " <> reason
+      let _ = send_disconnect(connection, state.phase, reason)
+      // Ensure enough time for the disconnect to send
+      process.sleep(100)
+      glisten.stop_abnormal(reason)
     }
   }
 }
@@ -126,19 +122,41 @@ type PacketError {
   InvalidPacket(phase: phase.Phase, packet: serverbound.Packet)
   InvalidProtocolPhase(state: Int)
   ProtocolError(error: error.ProtocolError)
+  InvalidFrame
   SocketError(reason: socket.SocketReason)
   PlayerNotStarted(error: actor.StartError)
   PlayerNotFound
 }
 
+fn handle_buffer(state: State, connection: Connection) {
+  case protocol.split_frames(state.buffer) {
+    Ok(#(frames, buffer)) -> {
+      let state = State(..state, buffer:)
+      list.try_fold(frames, state, fn(state, frame) {
+        logging.log(logging.Debug, "Frame: " <> bit_array.inspect(frame))
+        case protocol.decode_serverbound(state.phase, frame) {
+          Ok(#(packet, _)) -> handle_packet(state, packet, connection)
+          Error(error.DecodeError(_, id, error.UnhandledPacket)) -> {
+            logging.log(
+              logging.Warning,
+              "Unhandled Packet: " <> int.to_string(id),
+            )
+            Ok(state)
+          }
+          Error(error) -> Error(ProtocolError(error))
+        }
+      })
+    }
+    Error(_) -> Error(InvalidFrame)
+  }
+}
+
 fn handle_packet(
   state: State,
-  bit_array: BitArray,
+  packet: serverbound.Packet,
   connection: Connection,
 ) -> Result(State, PacketError) {
   let State(phase: current_phase, player_manager_subject:, ..) = state
-  let server_bound = protocol.decode_serverbound(state.phase, bit_array)
-  use packet <- result.try(server_bound |> result.map_error(ProtocolError))
   case current_phase {
     phase.Handshaking -> {
       case packet {
@@ -410,6 +428,7 @@ fn handle_message(
 }
 
 fn handle_keep_alive(state: State, connection: Connection) {
+  logging.log(logging.Debug, "Received Keep Alive")
   use _ <- result.try(send_keep_alive(state.phase, connection))
   let keep_alive_timer = process.send_after(state.subject, 15_000, KeepAlive)
   Ok(State(..state, keep_alive_timer:))
@@ -440,6 +459,10 @@ fn handle_player_event(
 ) {
   case player_event {
     message.ChunkLoaded(chunk) -> {
+      logging.log(
+        logging.Debug,
+        "Loading Chunk: " <> chunk_position.to_string(chunk.position),
+      )
       use _ <- result.try(send_packet(
         connection,
         clientbound.LevelChunkWithLight(
@@ -452,6 +475,10 @@ fn handle_player_event(
       Ok(state)
     }
     message.ChunkUnloaded(position) -> {
+      logging.log(
+        logging.Debug,
+        "Unloading Chunk: " <> chunk_position.to_string(position),
+      )
       use _ <- result.try(send_packet(
         connection,
         clientbound.ForgetLevelChunk(clientbound.ForgetLevelChunkPacket(
@@ -461,6 +488,10 @@ fn handle_player_event(
       Ok(state)
     }
     message.CenterChunkChanged(position) -> {
+      logging.log(
+        logging.Debug,
+        "Updating Center Chunk: " <> chunk_position.to_string(position),
+      )
       use _ <- result.try(send_packet(
         connection,
         clientbound.SetCenterChunk(clientbound.SetCenterChunkPacket(position)),

@@ -26,6 +26,7 @@ import gleam/float
 import gleam/function
 import gleam/list
 import gleam/otp/actor
+import gleam/pair
 import gleam/set
 import gleam/string
 import glisten
@@ -104,7 +105,7 @@ fn handle_message(state: State, packet: Packet) -> actor.Next(State, Packet) {
   let result = case packet {
     ServerBoundPacket(data) -> {
       case protocol.decode_serverbound(state.phase, data) {
-        Ok(packet) -> handle_server_bound(packet, state)
+        Ok(#(packet, _)) -> handle_server_bound(packet, state)
         Error(error) -> {
           echo error
           Ok(state)

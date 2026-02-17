@@ -11,6 +11,7 @@ import logging
 
 pub fn main() {
   logging.configure()
+  logging.set_level(logging.Info)
 
   let world_name = process.new_name("world")
   let world = world.supervised(world_name)

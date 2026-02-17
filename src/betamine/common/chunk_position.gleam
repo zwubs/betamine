@@ -24,5 +24,13 @@ pub fn from_block_position(block_position: block_position.BlockPosition) {
 }
 
 pub fn chebyshev_distance(a: ChunkPosition, b: ChunkPosition) {
-  int.absolute_value(int.max(b.x - a.x, b.z - a.z))
+  int.max(int.absolute_value(b.x - a.x), int.absolute_value(b.z - a.z))
+}
+
+pub fn to_string(chunk_position: ChunkPosition) {
+  "ChunkPosition("
+  <> int.to_string(chunk_position.x)
+  <> ", "
+  <> int.to_string(chunk_position.z)
+  <> ")"
 }

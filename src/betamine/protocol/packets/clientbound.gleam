@@ -66,7 +66,7 @@ pub type Packet {
   SystemChat(packet: SystemChatPacket)
 }
 
-fn get_packet_id(packet: Packet) -> Int {
+pub fn get_packet_id(packet: Packet) -> Int {
   case packet {
     StatusResponse(..) -> 0
     StatusPong(..) -> 1
