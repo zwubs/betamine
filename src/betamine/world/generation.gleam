@@ -9,6 +9,8 @@ import betamine/protocol/common/chunk/paletted_container
 import gleam/float
 import gleam/int
 import gleam/list
+import gleam/result
+import gleam/set
 import iv
 
 const octaves = [#(1.0, -8.0), #(2.0, 16.0), #(8.0, 2.0)]
@@ -57,55 +59,77 @@ pub fn generate_chunk_section(
   options: GenerationOptions,
 ) -> chunk_section.ChunkSection {
   let relative_chunk_section_range = list.range(0, 15)
-
   let empty_chunk_section_array =
     iv.initialise(16 * 16 * 16, fn(_) { block_state.Air })
 
-  let data =
+  let #(array, palette) =
     list.fold(
       relative_chunk_section_range,
-      empty_chunk_section_array,
-      fn(array, relative_x) {
+      #(empty_chunk_section_array, set.new()),
+      fn(array_palette_pair, relative_x) {
         let global_x = position.x * 16 + relative_x
-        list.fold(relative_chunk_section_range, array, fn(array, relative_z) {
-          let global_z = position.z * 16 + relative_z
-          let terrain_y =
-            options.min_terrain_height
-            + float.truncate(
-              calculate_noise(options.seed, global_x, global_z)
-              *. int.to_float(
-                options.max_terrain_height - options.min_terrain_height,
-              ),
+        list.fold(
+          relative_chunk_section_range,
+          array_palette_pair,
+          fn(array_palette_pair, relative_z) {
+            let global_z = position.z * 16 + relative_z
+            let terrain_y =
+              options.min_terrain_height
+              + float.truncate(
+                calculate_noise(options.seed, global_x, global_z)
+                *. int.to_float(
+                  options.max_terrain_height - options.min_terrain_height,
+                ),
+              )
+            list.fold(
+              relative_chunk_section_range,
+              array_palette_pair,
+              fn(array_palette_pair, relative_y) {
+                let #(array, palette) = array_palette_pair
+                let global_y = position.y * 16 + relative_y
+                let block_state = case global_y {
+                  y if y == terrain_y && y < options.water_level ->
+                    block_state.sand
+                  y if y == terrain_y -> block_state.grass_block
+                  y if y < terrain_y -> block_state.dirt
+                  y if y > terrain_y && y <= options.water_level ->
+                    block_state.water
+                  _ -> block_state.air
+                }
+                let index = relative_y * 256 + relative_z * 16 + relative_x
+                case block_state {
+                  block_state.Air -> array_palette_pair
+                  block_state -> {
+                    let array = iv.try_set(array, index, block_state)
+                    let palette = set.insert(palette, block_state)
+                    #(array, palette)
+                  }
+                }
+              },
             )
-          list.fold(relative_chunk_section_range, array, fn(array, relative_y) {
-            let global_y = position.y * 16 + relative_y
-            let index = relative_y * 256 + relative_z * 16 + relative_x
-            case global_y {
-              y if y == terrain_y && y < options.water_level ->
-                iv.try_set(array, index, block_state.sand)
-              y if y == terrain_y ->
-                iv.try_set(array, index, block_state.grass_block)
-              y if y < terrain_y -> iv.try_set(array, index, block_state.dirt)
-              y if y > terrain_y && y <= options.water_level ->
-                iv.try_set(array, index, block_state.water)
-              _ -> array
-            }
-          })
-        })
+          },
+        )
       },
     )
 
+  let palette = [block_state.air, ..set.to_list(palette)]
+  let indexed_palette = iv.from_list(palette)
+  let int_palette = list.map(palette, block_state.to_int)
+
   chunk_section.ChunkSection(
     ..chunk_section.empty,
-    block_count: iv.fold(data, 0, fn(block_count, block_state) {
+    block_count: iv.fold(array, 0, fn(block_count, block_state) {
       case block_state {
         block_state.Air -> block_count
         _ -> block_count + 1
       }
     }),
     block_states: paletted_container.PalettedContainer(
-      data: iv.map(data, block_state.to_int) |> iv.to_list,
-      palette: chunk_section.direct_block_palette(),
+      data: iv.map(array, fn(block_state) {
+        iv.index_of(indexed_palette, block_state) |> result.unwrap(0)
+      })
+        |> iv.to_list,
+      palette: chunk_section.indirect_block_palette(int_palette),
     ),
   )
 }
