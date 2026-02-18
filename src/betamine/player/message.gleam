@@ -7,6 +7,10 @@ import betamine/protocol/common/chunk
 import gleam/erlang/process
 import gleam/option
 
+pub type ManagerCommand {
+  Stop
+}
+
 pub type WorldEvent {
   ChunkLoaded(chunk.Chunk)
 }

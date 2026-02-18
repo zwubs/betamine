@@ -6,7 +6,7 @@ import gleam/erlang/process
 import gleam/otp/actor
 
 pub type SessionCommand {
-  New(
+  NewPlayer(
     return_subject: process.Subject(
       Result(
         #(process.Subject(player_message.SessionCommand), profile.Profile),
@@ -16,5 +16,6 @@ pub type SessionCommand {
     uuid: uuid.Uuid,
     session_subject: process.Subject(session_message.PlayerEvent),
   )
+  StopPlayer(uuid: uuid.Uuid)
   GetAll(return_subject: process.Subject(List(#(uuid.Uuid, String))))
 }

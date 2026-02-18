@@ -1,6 +1,7 @@
 import betamine/common/chunk_position
 import betamine/common/difficulty
 import betamine/common/text_component
+import betamine/common/uuid
 import betamine/constant
 import betamine/player/manager as player_manager
 import betamine/player/manager_message as player_manager_message
@@ -15,7 +16,6 @@ import betamine/protocol/phase
 import betamine/protocol/registry
 import betamine/session/message
 import gleam/bit_array
-import gleam/bytes_tree
 import gleam/erlang/process
 import gleam/int
 import gleam/list
@@ -44,6 +44,7 @@ pub type State {
     phase: phase.Phase,
     ip_address: String,
     keep_alive_timer: process.Timer,
+    player_uuid: option.Option(uuid.Uuid),
     player_subject: option.Option(
       process.Subject(player_message.SessionCommand),
     ),
@@ -73,6 +74,7 @@ pub fn init(
       subject:,
       player_event_subject:,
       phase: phase.Handshaking,
+      player_uuid: option.None,
       player_subject: option.None,
       keep_alive_timer:,
       ip_address:,
@@ -90,6 +92,14 @@ pub fn init(
 
 pub fn close(state: State) {
   logging.log(logging.Debug, "Closing connection w/ " <> state.ip_address)
+  case state.player_uuid {
+    option.Some(uuid) ->
+      process.send(
+        state.player_manager_subject,
+        player_manager.SessionCommand(player_manager_message.StopPlayer(uuid)),
+      )
+    option.None -> Nil
+  }
 }
 
 pub fn loop(
@@ -131,8 +141,7 @@ type PacketError {
 fn handle_buffer(state: State, connection: Connection) {
   case protocol.split_frames(state.buffer) {
     Ok(#(frames, buffer)) -> {
-      let state = State(..state, buffer:)
-      list.try_fold(frames, state, fn(state, frame) {
+      list.try_fold(frames, State(..state, buffer:), fn(state, frame) {
         logging.log(logging.Debug, "Frame: " <> bit_array.inspect(frame))
         case protocol.decode_serverbound(state.phase, frame) {
           Ok(#(packet, _)) -> handle_packet(state, packet, connection)
@@ -209,7 +218,7 @@ fn handle_packet(
         serverbound.LoginStart(packet) -> {
           let new_player_result =
             process.call(player_manager_subject, 10_000, fn(return_subject) {
-              player_manager.SessionCommand(player_manager_message.New(
+              player_manager.SessionCommand(player_manager_message.NewPlayer(
                 return_subject,
                 packet.uuid,
                 state.player_event_subject,
@@ -221,7 +230,13 @@ fn handle_packet(
                 connection,
                 clientbound.LoginSuccess(clientbound.LoginSuccessPacket(profile)),
               ))
-              Ok(State(..state, player_subject: option.Some(player_subject)))
+              Ok(
+                State(
+                  ..state,
+                  player_subject: option.Some(player_subject),
+                  player_uuid: option.Some(profile.id),
+                ),
+              )
             }
             Error(actor_start_error) ->
               Error(PlayerNotStarted(actor_start_error))

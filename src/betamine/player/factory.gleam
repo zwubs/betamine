@@ -11,7 +11,11 @@ import gleam/otp/supervision
 pub type Message =
   factory_supervisor.Message(
     #(uuid.Uuid, process.Subject(session_message.PlayerEvent)),
-    #(process.Subject(player_message.SessionCommand), profile.Profile),
+    #(
+      process.Subject(player_message.SessionCommand),
+      process.Subject(player_message.ManagerCommand),
+      profile.Profile,
+    ),
   )
 
 pub type Name =

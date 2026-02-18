@@ -20,8 +20,9 @@ import gleam/otp/actor
 import gleam/set
 
 pub type Message {
-  SessionCommand(message.SessionCommand)
   WorldEvent(message.WorldEvent)
+  ManagerCommand(message.ManagerCommand)
+  SessionCommand(message.SessionCommand)
 }
 
 type State {
@@ -40,18 +41,17 @@ pub fn start(
   uuid: uuid.Uuid,
   session_subject: process.Subject(session_message.PlayerEvent),
   world_name: world.Name,
-) -> Result(
-  actor.Started(#(process.Subject(message.SessionCommand), profile.Profile)),
-  actor.StartError,
 ) {
   let world_subject = process.named_subject(world_name)
   actor.new_with_initialiser(10_000, fn(_) {
     let assert Ok(profile) = mojang.fetch_profile(uuid)
     let world_event_subject = process.new_subject()
+    let manager_command_subject = process.new_subject()
     let session_command_subject = process.new_subject()
     let selector =
       process.new_selector()
       |> process.select_map(world_event_subject, WorldEvent)
+      |> process.select_map(manager_command_subject, ManagerCommand)
       |> process.select_map(session_command_subject, SessionCommand)
     let state: State =
       State(
@@ -69,7 +69,11 @@ pub fn start(
       )
     actor.initialised(state)
     |> actor.selecting(selector)
-    |> actor.returning(#(session_command_subject, profile))
+    |> actor.returning(#(
+      session_command_subject,
+      manager_command_subject,
+      profile,
+    ))
     |> Ok
   })
   |> actor.on_message(handle_message)
@@ -81,6 +85,8 @@ fn handle_message(state: State, message: Message) {
     SessionCommand(session_command) ->
       handle_session_command(state, session_command)
     WorldEvent(world_event) -> handle_world_event(state, world_event)
+    ManagerCommand(manager_command) ->
+      handle_manager_command(state, manager_command)
   }
 }
 
@@ -202,4 +208,13 @@ fn handle_world_event(
     }
   }
   |> actor.continue()
+}
+
+fn handle_manager_command(
+  _state: State,
+  manager_command: message.ManagerCommand,
+) -> actor.Next(State, Message) {
+  case manager_command {
+    message.Stop -> actor.stop()
+  }
 }

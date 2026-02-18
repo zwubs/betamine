@@ -13,7 +13,7 @@ import gleam/otp/supervision
 import gleam/pair
 
 type PlayerSubject =
-  process.Subject(player_message.SessionCommand)
+  process.Subject(player_message.ManagerCommand)
 
 pub type Message {
   SessionCommand(message.SessionCommand)
@@ -31,7 +31,11 @@ type State {
     players: dict.Dict(uuid.Uuid, PlayerInstance),
     player_factory: factory_supervisor.Supervisor(
       #(uuid.Uuid, process.Subject(session_message.PlayerEvent)),
-      #(PlayerSubject, profile.Profile),
+      #(
+        process.Subject(player_message.SessionCommand),
+        PlayerSubject,
+        profile.Profile,
+      ),
     ),
   )
 }
@@ -64,13 +68,20 @@ fn handle_message(state: State, message: Message) {
 fn handle_session_command(state: State, session_command: message.SessionCommand) {
   let State(players:, player_factory:) = state
   case session_command {
-    message.New(return_subject:, uuid:, session_subject:) -> {
+    message.NewPlayer(return_subject:, uuid:, session_subject:) -> {
       case
         factory_supervisor.start_child(player_factory, #(uuid, session_subject))
       {
         Ok(actor.Started(_pid, data)) -> {
-          process.send(return_subject, Ok(data))
-          let #(player_subject, profile.Profile(id:, name:, ..)) = data
+          let #(
+            player_subject_for_session,
+            player_subject,
+            profile.Profile(id:, name:, ..) as profile,
+          ) = data
+          process.send(
+            return_subject,
+            Ok(#(player_subject_for_session, profile)),
+          )
           let player_instance = PlayerInstance(name, player_subject)
           let players = dict.insert(players, id, player_instance)
           State(..state, players:)
@@ -80,6 +91,15 @@ fn handle_session_command(state: State, session_command: message.SessionCommand)
           state
         }
       }
+    }
+    message.StopPlayer(uuid:) -> {
+      case dict.get(state.players, uuid) {
+        Ok(PlayerInstance(subject:, ..)) ->
+          process.send(subject, player_message.Stop)
+        _ -> Nil
+      }
+      let players = dict.delete(state.players, uuid)
+      State(..state, players:)
     }
     message.GetAll(return_subject:) -> {
       let players =
