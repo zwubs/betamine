@@ -179,7 +179,7 @@ fn handle_server_bound(packet: serverbound.Packet, state: State) {
           max_player_count: constant.mc_max_player_count,
           online_player_count: 0,
           players: [#(uuid.default, "zwubs")],
-          description: "Hello Betamine!",
+          description: constant.mc_server_description,
           favicon: constant.mc_favicon,
           enforces_secure_chat: False,
         )),

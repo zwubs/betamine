@@ -169,7 +169,7 @@ pub type StatusResponsePacket {
     max_player_count: Int,
     online_player_count: Int,
     players: List(#(uuid.Uuid, String)),
-    description: String,
+    description: text_component.TextComponent,
     favicon: String,
     enforces_secure_chat: Bool,
   )
@@ -203,7 +203,7 @@ fn encode_status_response(tree: BytesTree, packet: StatusResponsePacket) {
         ),
       ]),
     ),
-    #("description", json.object([#("text", json.string(packet.description))])),
+    #("description", text_component.to_json(packet.description)),
     #("favicon", json.string(packet.favicon)),
     #("enforcesSecureChat", json.bool(packet.enforces_secure_chat)),
   ])

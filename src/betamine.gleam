@@ -1,5 +1,5 @@
 import betamine/constant
-import betamine/game
+import betamine/entity_region/supervisor as entity_region_supervisor
 import betamine/player/supervisor as player_supervisor
 import betamine/session/session
 import betamine/world/world
@@ -16,8 +16,13 @@ pub fn main() {
   let world_name = process.new_name("world")
   let world = world.supervised(world_name)
 
-  let game_name = process.new_name("game")
-  let game = game.supervised(game_name)
+  let entity_region_factory_name = process.new_name("entity_region_factory")
+  let entity_region_manager_name = process.new_name("entity_region_manager")
+  let entity_region_supervisor =
+    entity_region_supervisor.supervised(
+      entity_region_factory_name,
+      entity_region_manager_name,
+    )
 
   let player_factory_name = process.new_name("player_factory")
   let player_manager_name = process.new_name("player_manager")
@@ -37,7 +42,7 @@ pub fn main() {
   let assert Ok(_) =
     static_supervisor.new(static_supervisor.OneForOne)
     |> static_supervisor.add(world)
-    |> static_supervisor.add(game)
+    |> static_supervisor.add(entity_region_supervisor)
     |> static_supervisor.add(player_supervisor)
     |> static_supervisor.add(http_server)
     |> static_supervisor.start()

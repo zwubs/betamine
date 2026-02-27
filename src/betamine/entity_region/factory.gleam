@@ -1,13 +1,13 @@
-import betamine/player/player
+import betamine/entity_region/region
 import gleam/erlang/process
 import gleam/otp/factory_supervisor
 import gleam/otp/supervision
 
 pub type Message =
-  factory_supervisor.Message(player.Requiring, player.Returning)
+  factory_supervisor.Message(region.Requiring, region.Returning)
 
 pub type Supervisor =
-  factory_supervisor.Supervisor(player.Requiring, player.Returning)
+  factory_supervisor.Supervisor(region.Requiring, region.Returning)
 
 pub type Name =
   process.Name(Message)
@@ -17,7 +17,7 @@ pub fn supervised(name: Name) {
 }
 
 pub fn start(name: Name) {
-  factory_supervisor.worker_child(player.start)
+  factory_supervisor.worker_child(region.start)
   |> factory_supervisor.named(name)
   |> factory_supervisor.start()
 }

@@ -7,6 +7,7 @@ pub type ProtocolError {
 pub type DecodeError {
   UnhandledPacket
   InvalidPacket
+  InvalidPacketLength(length: Int)
   InvalidByteRange(data: BitArray, byte_count: Int)
   InvalidVarInt
   InvalidString(data: BitArray)

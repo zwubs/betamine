@@ -3,8 +3,6 @@ import betamine/common/difficulty
 import betamine/common/text_component
 import betamine/common/uuid
 import betamine/constant
-import betamine/player/manager as player_manager
-import betamine/player/manager_message as player_manager_message
 import betamine/player/message as player_message
 import betamine/protocol
 import betamine/protocol/common/chunk
@@ -28,51 +26,40 @@ import glisten
 import glisten/socket
 import logging
 
-pub type Message {
-  KeepAlive
-  PlayerEvent(message.PlayerEvent)
-}
-
 type Connection =
-  glisten.Connection(Message)
+  glisten.Connection(message.Message)
 
 pub type State {
   State(
     buffer: BitArray,
-    subject: process.Subject(Message),
-    player_event_subject: process.Subject(message.PlayerEvent),
+    subject: process.Subject(message.Message),
     phase: phase.Phase,
     ip_address: String,
     keep_alive_timer: process.Timer,
     player_uuid: option.Option(uuid.Uuid),
-    player_subject: option.Option(
-      process.Subject(player_message.SessionCommand),
-    ),
-    player_manager_subject: process.Subject(player_manager.Message),
+    player_subject: option.Option(player_message.PlayerSubject),
+    player_manager_subject: player_message.ManagerSubject,
     chunk_subject: process.Subject(chunk.Chunk),
   )
 }
 
 pub fn init(
   connection: Connection,
-  player_manager_name: process.Name(player_manager.Message),
-) -> #(State, option.Option(process.Selector(Message))) {
+  player_manager_name: player_message.ManagerName,
+) -> #(State, option.Option(process.Selector(message.Message))) {
   let assert Ok(connection_info) = glisten.get_client_info(connection)
   let ip_address = glisten.ip_address_to_string(connection_info.ip_address)
   logging.log(logging.Debug, "Starting connection w/ " <> ip_address)
-
   let player_manager_subject = process.named_subject(player_manager_name)
 
   let subject = process.new_subject()
-  let player_event_subject = process.new_subject()
-  let keep_alive_timer = process.send_after(subject, 15_000, KeepAlive)
+  let keep_alive_timer = process.send_after(subject, 15_000, message.KeepAlive)
   let chunk_subject: process.Subject(chunk.Chunk) = process.new_subject()
 
   let state =
     State(
       buffer: <<>>,
       subject:,
-      player_event_subject:,
       phase: phase.Handshaking,
       player_uuid: option.None,
       player_subject: option.None,
@@ -82,12 +69,7 @@ pub fn init(
       chunk_subject:,
     )
 
-  let selector =
-    process.new_selector()
-    |> process.select(subject)
-    |> process.select_map(player_event_subject, PlayerEvent)
-
-  #(state, option.Some(selector))
+  #(state, option.Some(process.select(process.new_selector(), subject)))
 }
 
 pub fn close(state: State) {
@@ -96,7 +78,7 @@ pub fn close(state: State) {
     option.Some(uuid) ->
       process.send(
         state.player_manager_subject,
-        player_manager.SessionCommand(player_manager_message.StopPlayer(uuid)),
+        player_message.StopPlayer(uuid),
       )
     option.None -> Nil
   }
@@ -104,9 +86,9 @@ pub fn close(state: State) {
 
 pub fn loop(
   state: State,
-  message: glisten.Message(Message),
+  message: glisten.Message(message.Message),
   connection: Connection,
-) -> glisten.Next(State, glisten.Message(Message)) {
+) -> glisten.Next(State, glisten.Message(message.Message)) {
   let message_result = case message {
     glisten.Packet(chunk) -> {
       let state = State(..state, buffer: bit_array.append(state.buffer, chunk))
@@ -182,11 +164,9 @@ fn handle_packet(
     phase.Status -> {
       case packet {
         serverbound.StatusRequest -> {
-          let players =
+          let player_list =
             process.call(state.player_manager_subject, 1000, fn(return_subject) {
-              player_manager.SessionCommand(player_manager_message.GetAll(
-                return_subject,
-              ))
+              player_message.GetPlayerList(return_subject)
             })
           use _ <- result.try(send_packet(
             connection,
@@ -194,9 +174,9 @@ fn handle_packet(
               version_name: constant.mc_version_name,
               version_protocol: constant.mc_version_protocol,
               max_player_count: constant.mc_max_player_count,
-              online_player_count: list.length(players),
-              players:,
-              description: "Hello Betamine!",
+              online_player_count: list.length(player_list),
+              players: player_list,
+              description: constant.mc_server_description,
               favicon: constant.mc_favicon,
               enforces_secure_chat: False,
             )),
@@ -218,11 +198,11 @@ fn handle_packet(
         serverbound.LoginStart(packet) -> {
           let new_player_result =
             process.call(player_manager_subject, 10_000, fn(return_subject) {
-              player_manager.SessionCommand(player_manager_message.NewPlayer(
+              player_message.NewPlayer(
                 return_subject,
                 packet.uuid,
-                state.player_event_subject,
-              ))
+                state.subject,
+              )
             })
           case new_player_result {
             Ok(#(player_subject, profile)) -> {
@@ -250,7 +230,7 @@ fn handle_packet(
     phase.Configuration -> {
       case packet {
         serverbound.ClientInformation(client_information) -> {
-          use _ <- result.try(send_player_command(
+          use _ <- result.try(send_player_message(
             state.player_subject,
             player_message.UpdateClientInformation(client_information),
           ))
@@ -287,7 +267,7 @@ fn handle_packet(
             player_message.GetSpawnInformation,
           ))
 
-          use _ <- result.try(send_player_command(
+          use _ <- result.try(send_player_message(
             state.player_subject,
             player_message.LoadInitialChunks,
           ))
@@ -369,7 +349,7 @@ fn handle_packet(
               option.Some(rotation)
             _ -> option.None
           }
-          use _ <- result.try(send_player_command(
+          use _ <- result.try(send_player_message(
             state.player_subject,
             player_message.Move(position:, rotation:, on_ground:, against_wall:),
           ))
@@ -381,20 +361,20 @@ fn handle_packet(
   }
 }
 
-fn send_player_command(
-  subject: option.Option(process.Subject(player_message.SessionCommand)),
-  command: player_message.SessionCommand,
+fn send_player_message(
+  subject: option.Option(player_message.PlayerSubject),
+  message: player_message.PlayerMessage,
 ) {
   case subject {
-    option.Some(player_subject) -> Ok(process.send(player_subject, command))
+    option.Some(player_subject) -> Ok(process.send(player_subject, message))
     option.None -> Error(PlayerNotFound)
   }
 }
 
 fn call_player(
-  player_subject: option.Option(process.Subject(player_message.SessionCommand)),
+  player_subject: option.Option(player_message.PlayerSubject),
   timeout: Int,
-  make_request: fn(process.Subject(reply)) -> player_message.SessionCommand,
+  make_request: fn(process.Subject(reply)) -> player_message.PlayerMessage,
 ) {
   case player_subject {
     option.Some(player_subject) ->
@@ -404,7 +384,7 @@ fn call_player(
 }
 
 fn send_disconnect(
-  connection: glisten.Connection(Message),
+  connection: glisten.Connection(message.Message),
   phase: phase.Phase,
   reason: String,
 ) {
@@ -432,47 +412,11 @@ fn send_disconnect(
 
 fn handle_message(
   state: State,
-  message: Message,
+  message: message.Message,
   connection: Connection,
 ) -> Result(State, PacketError) {
   case message {
-    KeepAlive -> handle_keep_alive(state, connection)
-    PlayerEvent(player_event) ->
-      handle_player_event(state, player_event, connection)
-  }
-}
-
-fn handle_keep_alive(state: State, connection: Connection) {
-  logging.log(logging.Debug, "Received Keep Alive")
-  use _ <- result.try(send_keep_alive(state.phase, connection))
-  let keep_alive_timer = process.send_after(state.subject, 15_000, KeepAlive)
-  Ok(State(..state, keep_alive_timer:))
-}
-
-fn send_keep_alive(phase: phase.Phase, connection: Connection) {
-  case phase {
-    phase.Configuration -> {
-      send_packet(
-        connection,
-        clientbound.ConfigurationKeepAlive(clientbound.KeepAlivePacket(0)),
-      )
-    }
-    phase.Play -> {
-      send_packet(
-        connection,
-        clientbound.PlayKeepAlive(clientbound.KeepAlivePacket(0)),
-      )
-    }
-    _ -> Ok(Nil)
-  }
-}
-
-fn handle_player_event(
-  state: State,
-  player_event: message.PlayerEvent,
-  connection: Connection,
-) {
-  case player_event {
+    message.KeepAlive -> handle_keep_alive(state, connection)
     message.ChunkLoaded(chunk) -> {
       logging.log(
         logging.Debug,
@@ -513,6 +457,21 @@ fn handle_player_event(
       ))
       Ok(state)
     }
+    message.EntitySpawned(entity:) -> {
+      use _ <- result.try(send_packet(
+        connection,
+        clientbound.SpawnEntity(clientbound.SpawnEntityPacket(
+          id: entity.id,
+          uuid: entity.uuid,
+          entity_type: entity.kind,
+          position: entity.position,
+          rotation: entity.rotation,
+          head_rotation: entity.head_rotation,
+          velocity: entity.velocity,
+        )),
+      ))
+      Ok(state)
+    }
     message.EntityMoved(id:, position_delta:, rotation:, on_ground:) -> {
       case position_delta, rotation {
         option.Some(delta), option.Some(rotation) -> {
@@ -542,6 +501,32 @@ fn handle_player_event(
       }
       |> result.replace(state)
     }
+  }
+}
+
+fn handle_keep_alive(state: State, connection: Connection) {
+  logging.log(logging.Debug, "Received Keep Alive")
+  use _ <- result.try(send_keep_alive(state.phase, connection))
+  let keep_alive_timer =
+    process.send_after(state.subject, 15_000, message.KeepAlive)
+  Ok(State(..state, keep_alive_timer:))
+}
+
+fn send_keep_alive(phase: phase.Phase, connection: Connection) {
+  case phase {
+    phase.Configuration -> {
+      send_packet(
+        connection,
+        clientbound.ConfigurationKeepAlive(clientbound.KeepAlivePacket(0)),
+      )
+    }
+    phase.Play -> {
+      send_packet(
+        connection,
+        clientbound.PlayKeepAlive(clientbound.KeepAlivePacket(0)),
+      )
+    }
+    _ -> Ok(Nil)
   }
 }
 

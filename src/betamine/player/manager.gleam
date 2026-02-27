@@ -1,58 +1,64 @@
 import betamine/common/profile
 import betamine/common/uuid
 import betamine/player/factory
-import betamine/player/manager_message as message
-import betamine/player/message as player_message
-import betamine/session/message as session_message
+import betamine/player/message
+import betamine/player/player
+import betamine/world/message as world_message
+import gleam/bool
 import gleam/dict
 import gleam/erlang/process
 import gleam/list
 import gleam/otp/actor
 import gleam/otp/factory_supervisor
 import gleam/otp/supervision
-import gleam/pair
 
-type PlayerSubject =
-  process.Subject(player_message.ManagerCommand)
+type Message =
+  message.ManagerMessage
 
-pub type Message {
-  SessionCommand(message.SessionCommand)
-}
+type Subject =
+  message.ManagerSubject
 
-pub type Name =
-  process.Name(Message)
+type Name =
+  message.ManagerName
 
 type PlayerInstance {
-  PlayerInstance(name: String, subject: PlayerSubject)
+  PlayerInstance(
+    profile: profile.Profile,
+    subject: message.PlayerSubject,
+    pid: process.Pid,
+  )
 }
 
 type State {
   State(
+    subject: Subject,
     players: dict.Dict(uuid.Uuid, PlayerInstance),
-    player_factory: factory_supervisor.Supervisor(
-      #(uuid.Uuid, process.Subject(session_message.PlayerEvent)),
-      #(
-        process.Subject(player_message.SessionCommand),
-        PlayerSubject,
-        profile.Profile,
-      ),
-    ),
+    player_factory: factory.Supervisor,
+    world_subject: world_message.Subject,
   )
 }
 
 pub fn supervised(
   name: Name,
-  factory_name: process.Name(factory.Message),
-) -> supervision.ChildSpecification(process.Subject(Message)) {
-  supervision.worker(fn() { start(name, factory_name) })
+  factory_name: factory.Name,
+  world_name: world_message.Name,
+) -> supervision.ChildSpecification(Subject) {
+  supervision.worker(fn() { start(name, factory_name, world_name) })
 }
 
 pub fn start(
   name: Name,
-  factory_name: process.Name(factory.Message),
-) -> Result(actor.Started(process.Subject(Message)), actor.StartError) {
+  factory_name: factory.Name,
+  world_name: world_message.Name,
+) -> Result(actor.Started(Subject), actor.StartError) {
   let factory = factory_supervisor.get_by_name(factory_name)
-  actor.new(State(dict.new(), factory))
+  let world_subject = process.named_subject(world_name)
+  actor.new_with_initialiser(1000, fn(subject) {
+    actor.initialised(State(subject, dict.new(), factory, world_subject))
+    |> actor.selecting(process.select(process.new_selector(), subject))
+    |> actor.returning(subject)
+    |> Ok
+  })
   |> actor.on_message(handle_message)
   |> actor.named(name)
   |> actor.start()
@@ -60,54 +66,56 @@ pub fn start(
 
 fn handle_message(state: State, message: Message) {
   case message {
-    SessionCommand(session_command) ->
-      handle_session_command(state, session_command)
-  }
-}
-
-fn handle_session_command(state: State, session_command: message.SessionCommand) {
-  let State(players:, player_factory:) = state
-  case session_command {
     message.NewPlayer(return_subject:, uuid:, session_subject:) -> {
       case
-        factory_supervisor.start_child(player_factory, #(uuid, session_subject))
+        factory_supervisor.start_child(
+          state.player_factory,
+          player.Requiring(
+            uuid:,
+            session_subject:,
+            world_subject: state.world_subject,
+            manager_subject: state.subject,
+          ),
+        )
       {
-        Ok(actor.Started(_pid, data)) -> {
-          let #(
-            player_subject_for_session,
-            player_subject,
-            profile.Profile(id:, name:, ..) as profile,
-          ) = data
-          process.send(
-            return_subject,
-            Ok(#(player_subject_for_session, profile)),
-          )
-          let player_instance = PlayerInstance(name, player_subject)
-          let players = dict.insert(players, id, player_instance)
-          State(..state, players:)
+        Ok(actor.Started(pid, returning)) -> {
+          let player.Returning(profile:, subject:) = returning
+          process.send(return_subject, Ok(#(subject, profile)))
+          let player_instance = PlayerInstance(profile, subject, pid)
+          let players = dict.insert(state.players, uuid, player_instance)
+          actor.continue(State(..state, players:))
         }
         Error(actor_error) -> {
           process.send(return_subject, Error(actor_error))
-          state
+          actor.continue(state)
         }
       }
     }
     message.StopPlayer(uuid:) -> {
       case dict.get(state.players, uuid) {
-        Ok(PlayerInstance(subject:, ..)) ->
-          process.send(subject, player_message.Stop)
+        Ok(PlayerInstance(subject:, ..)) -> process.send(subject, message.Stop)
         _ -> Nil
       }
       let players = dict.delete(state.players, uuid)
-      State(..state, players:)
+      actor.continue(State(..state, players:))
     }
-    message.GetAll(return_subject:) -> {
-      let players =
-        dict.to_list(state.players)
-        |> list.map(pair.map_second(_, fn(instance) { instance.name }))
-      process.send(return_subject, players)
-      state
+    message.GetPlayerList(return_subject:) -> {
+      let player_list =
+        dict.values(state.players)
+        |> list.map(fn(instance) {
+          #(instance.profile.id, instance.profile.name)
+        })
+      process.send(return_subject, player_list)
+      actor.continue(state)
+    }
+    message.GetAllPlayers(..) -> todo
+    message.MessageOtherPlayers(uuid:, message:) -> {
+      let _ =
+        dict.each(state.players, fn(player_uuid, player_instance) {
+          use <- bool.guard(player_uuid == uuid, Nil)
+          process.send(player_instance.subject, message)
+        })
+      actor.continue(state)
     }
   }
-  |> actor.continue()
 }
