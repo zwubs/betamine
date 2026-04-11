@@ -26,7 +26,6 @@ import gleam/float
 import gleam/function
 import gleam/list
 import gleam/otp/actor
-import gleam/pair
 import gleam/set
 import gleam/string
 import glisten

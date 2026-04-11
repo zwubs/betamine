@@ -509,7 +509,7 @@ fn encode_level_chunk_with_light(
   tree
   |> chunk.encode(packet.chunk)
   |> encoder.array(packet.block_entities, fn(_, _) {
-    todo as "Encode block entities"
+    panic as "Encode block entities"
   })
   |> encoder.array(packet.sky_light_mask, encoder.long)
   |> encoder.array(packet.block_light_mask, encoder.long)

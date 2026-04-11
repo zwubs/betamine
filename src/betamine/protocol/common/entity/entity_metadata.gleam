@@ -150,6 +150,6 @@ fn encode_data_type(bytes_tree: bytes_tree.BytesTree, data_type: DataType) {
       _,
       entity_handedness.to_int(entity_handedness),
     )
-    _ -> todo as "Unhandled metadata type"
+    _ -> panic as "Unhandled metadata type"
   }
 }

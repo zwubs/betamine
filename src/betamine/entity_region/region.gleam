@@ -33,5 +33,7 @@ fn handle_message(
   state: State,
   message: message.RegionMessage,
 ) -> actor.Next(State, message.RegionMessage) {
-  todo
+  case message {
+    message.AddEntity -> actor.continue(state)
+  }
 }

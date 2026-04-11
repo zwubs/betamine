@@ -39,6 +39,6 @@ pub fn encode(tree: bytes_tree.BytesTree, chunk: Chunk) {
   tree
   |> encoder.int(chunk.position.x)
   |> encoder.int(chunk.position.z)
-  |> encoder.array(chunk.heightmaps, fn(_, _) { todo as "Encode heightmaps" })
+  |> encoder.array(chunk.heightmaps, fn(_, _) { panic as "Encode heightmaps" })
   |> chunk_section.encode_list(chunk.sections)
 }

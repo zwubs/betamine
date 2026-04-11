@@ -31,6 +31,7 @@ fn split_frame_loop(
   logging.log(logging.Debug, "Frames: " <> string.inspect(frames))
   case decoder.var_int(buffer) {
     Ok(#(length, _)) if length > max_packet_length -> Error(Nil)
+    Ok(#(length, _)) if length < min_packet_length -> Error(Nil)
     Ok(#(length, buffer)) -> {
       case buffer {
         <<frame:bytes-size(length)>> ->

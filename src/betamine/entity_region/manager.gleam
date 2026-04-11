@@ -47,6 +47,6 @@ pub fn start(
 
 fn handle_message(state: State, message: Message) -> actor.Next(State, Message) {
   case message {
-    message.SpawnEntity(entity) -> todo
+    message.SpawnEntity(..) -> actor.continue(state)
   }
 }

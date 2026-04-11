@@ -108,7 +108,7 @@ fn handle_message(state: State, message: Message) {
       process.send(return_subject, player_list)
       actor.continue(state)
     }
-    message.GetAllPlayers(..) -> todo
+    message.GetAllPlayers(..) -> actor.continue(state)
     message.MessageOtherPlayers(uuid:, message:) -> {
       let _ =
         dict.each(state.players, fn(player_uuid, player_instance) {

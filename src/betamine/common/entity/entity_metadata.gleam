@@ -103,9 +103,9 @@ fn get_bit_7(metadata: EntityMetadata, index: Int) {
   get_bit(metadata, index, 0b01000000)
 }
 
-fn get_bit_8(metadata: EntityMetadata, index: Int) {
-  get_bit(metadata, index, 0b10000000)
-}
+// fn get_bit_8(metadata: EntityMetadata, index: Int) {
+//   get_bit(metadata, index, 0b10000000)
+// }
 
 fn set_bit(metadata: EntityMetadata, index: Int, bitmask: Int, value: Bool) {
   use current <- result.try(get_byte(metadata, 0))
@@ -144,9 +144,9 @@ fn set_bit_7(metadata: EntityMetadata, index: Int, value: Bool) {
   set_bit(metadata, index, 0b01000000, value)
 }
 
-fn set_bit_8(metadata: EntityMetadata, index: Int, value: Bool) {
-  set_bit(metadata, index, 0b10000000, value)
-}
+// fn set_bit_8(metadata: EntityMetadata, index: Int, value: Bool) {
+//   set_bit(metadata, index, 0b10000000, value)
+// }
 
 fn get_float(metadata: EntityMetadata, index: Int) {
   case dict.get(metadata.values, index) {
@@ -185,11 +185,11 @@ fn get_optional_text_component(metadata: EntityMetadata, index: Int) {
 }
 
 fn set_optional_text_component(
-  metadata: EntityMetadata,
-  index: Int,
-  optional_text_component: option.Option(text_component.TextComponent),
+  _metadata: EntityMetadata,
+  _index: Int,
+  _optional_text_component: option.Option(text_component.TextComponent),
 ) {
-  todo
+  Error(Nil)
 }
 
 fn get_boolean(metadata: EntityMetadata, index: Int) {
@@ -284,16 +284,16 @@ pub const spin_attacking = MetadataAccessor(8, get_bit_3, set_bit_3)
 
 pub const health = MetadataAccessor(9, get_float, set_float)
 
-fn get_particles(metadata: EntityMetadata, index: Int) {
-  todo
+fn get_particles(_metadata: EntityMetadata, _index: Int) {
+  Error(Nil)
 }
 
 fn set_particles(
-  metadata: EntityMetadata,
-  index: Int,
-  particles: List(particle.Particle),
+  _metadata: EntityMetadata,
+  _index: Int,
+  _particles: List(particle.Particle),
 ) {
-  todo
+  Error(Nil)
 }
 
 pub const potion_effect_color = MetadataAccessor(
@@ -312,16 +312,16 @@ pub const impaled_arrow_count = MetadataAccessor(12, get_var_int, set_var_int)
 
 pub const impaled_stinger_count = MetadataAccessor(13, get_var_int, set_var_int)
 
-pub fn get_optional_position(metadata: EntityMetadata, index: Int) {
-  todo
+pub fn get_optional_position(_metadata: EntityMetadata, _index: Int) {
+  Error(Nil)
 }
 
 pub fn set_optional_position(
-  metadata: EntityMetadata,
-  index: Int,
-  position: option.Option(block_position.BlockPosition),
+  _metadata: EntityMetadata,
+  _index: Int,
+  _position: option.Option(block_position.BlockPosition),
 ) {
-  todo
+  Error(Nil)
 }
 
 pub const current_sleeping_bed_position = MetadataAccessor(
@@ -390,16 +390,16 @@ pub const additional_hearts = MetadataAccessor(17, get_float, set_float)
 
 pub const score = MetadataAccessor(18, get_var_int, set_var_int)
 
-pub fn get_optional_var_int(metadata: EntityMetadata, index: Int) {
-  todo
+pub fn get_optional_var_int(_metadata: EntityMetadata, _index: Int) {
+  Error(Nil)
 }
 
 pub fn set_optional_var_int(
-  metadata: EntityMetadata,
-  index: Int,
-  var_int: option.Option(Int),
+  _metadata: EntityMetadata,
+  _index: Int,
+  _var_int: option.Option(Int),
 ) {
-  todo
+  Error(Nil)
 }
 
 pub const left_shoulder_entity_data = MetadataAccessor(
