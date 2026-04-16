@@ -1,4 +1,6 @@
-import betamine/client/protocol/error
+import betamine/common/enum
+
+pub const enum = enum.Enum("Intention", 0, 2, from_int, to_int)
 
 /// Denotes the intention of the client's connection
 pub type Intention {
@@ -15,6 +17,14 @@ pub fn from_int(int: Int) {
     0 -> Ok(Status)
     1 -> Ok(Login)
     2 -> Ok(Transfer)
-    _ -> Error(error.InvalidEnumValue("Intention", min: 0, max: 2, value: int))
+    _ -> Error(Nil)
+  }
+}
+
+pub fn to_int(intention: Intention) {
+  case intention {
+    Status -> 0
+    Login -> 1
+    Transfer -> 2
   }
 }

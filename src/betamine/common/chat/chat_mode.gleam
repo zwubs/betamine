@@ -1,6 +1,6 @@
-import betamine/protocol/decoder
-import betamine/protocol/error
-import gleam/result
+import betamine/common/enum
+
+pub const enum = enum.Enum("ChatMode", 0, 2, from_int, to_int)
 
 pub type ChatMode {
   Enabled
@@ -8,16 +8,19 @@ pub type ChatMode {
   Hidden
 }
 
-pub fn from_int(int: Int) {
+fn from_int(int: Int) {
   case int {
     0 -> Ok(Enabled)
     1 -> Ok(CommandsOnly)
     2 -> Ok(Hidden)
-    _ -> Error(error.InvalidEnumValue("ChatMode", min: 0, max: 2, value: int))
+    _ -> Error(Nil)
   }
 }
 
-pub fn decode(data: BitArray) {
-  use #(hand, data) <- result.try(decoder.var_int(data))
-  result.map(from_int(hand), fn(hand) { #(hand, data) })
+fn to_int(chat_mode: ChatMode) {
+  case chat_mode {
+    Enabled -> 0
+    CommandsOnly -> 1
+    Hidden -> 2
+  }
 }

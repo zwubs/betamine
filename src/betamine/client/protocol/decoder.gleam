@@ -1,10 +1,14 @@
 import betamine/client/protocol/error.{type DecodeError}
+import betamine/common/enum
 import gleam/bit_array
 import gleam/int
 import gleam/result.{map, try}
 
 type DecodeResult(value) =
   Result(#(value, BitArray), DecodeError)
+
+type Decoder(value) =
+  fn(BitArray) -> DecodeResult(value)
 
 @external(erlang, "erlang", "bit_size")
 pub fn bit_size(x: BitArray) -> Int
@@ -138,31 +142,34 @@ pub fn double(bit_array: BitArray) {
   }
 }
 
-type DecodeArrayResult(value) =
-  Result(#(List(value), BitArray), DecodeError)
-
-type ArrayParser(value) =
-  fn(BitArray) -> Result(#(value, BitArray), DecodeError)
-
 pub fn array(
   bit_array: BitArray,
-  parser: ArrayParser(value),
+  decoder: Decoder(value),
   length: Int,
-) -> DecodeArrayResult(value) {
-  array_elements(bit_array, parser, [], length)
+) -> DecodeResult(List(value)) {
+  array_elements(bit_array, decoder, [], length)
 }
 
 fn array_elements(
   bit_array: BitArray,
-  parser: ArrayParser(value),
+  decoder: Decoder(value),
   values: List(value),
   length: Int,
-) -> DecodeArrayResult(value) {
+) -> DecodeResult(List(value)) {
   case length {
     l if l < 1 -> Ok(#(values, bit_array))
     _ -> {
-      use #(value, bit_array) <- try(parser(bit_array))
-      array_elements(bit_array, parser, [value, ..values], length - 1)
+      use #(value, bit_array) <- try(decoder(bit_array))
+      array_elements(bit_array, decoder, [value, ..values], length - 1)
     }
+  }
+}
+
+pub fn enum(bit_array: BitArray, decoder: Decoder(Int), enum: enum.Enum(of)) {
+  use #(int, bit_array) <- result.try(decoder(bit_array))
+  case enum.from_int(int) {
+    Ok(value) -> Ok(#(value, bit_array))
+    Error(_) ->
+      Error(error.InvalidEnumValue(enum.name, enum.min, enum.max, int))
   }
 }

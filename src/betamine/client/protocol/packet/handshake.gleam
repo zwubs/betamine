@@ -28,9 +28,10 @@ fn decode_intention(
   use #(protocol_version, bit_array) <- result.try(decoder.var_int(bit_array))
   use #(address, bit_array) <- result.try(decoder.string(bit_array))
   use #(port, bit_array) <- result.try(decoder.unsigned_short(bit_array))
-  use intention <- result.try({
-    use #(int, _) <- result.try(decoder.var_int(bit_array))
-    intention.from_int(int)
-  })
+  use #(intention, _) <- result.try(decoder.enum(
+    bit_array,
+    decoder.var_int,
+    intention.enum,
+  ))
   Ok(ServerboundIntention(protocol_version:, address:, port:, intention:))
 }

@@ -54,31 +54,35 @@ pub fn decode(
 }
 
 fn decode_client_information(
-  _bit_array: BitArray,
+  bit_array: BitArray,
 ) -> Result(Serverbound, error.DecodeError) {
   use #(locale, bit_array) <- result.try(decoder.string(bit_array))
   use #(view_distance, bit_array) <- result.try(decoder.byte(bit_array))
-  use #(chat_mode, bit_array) <- result.try(chat_mode.decode(bit_array))
+  use #(chat_mode, bit_array) <- result.try(decoder.enum(
+    bit_array,
+    decoder.var_int,
+    chat_mode.enum,
+  ))
   use #(chat_colors, bit_array) <- result.try(decoder.boolean(bit_array))
   use #(model_customizations, bit_array) <- result.try(decoder.unsigned_byte(
     bit_array,
   ))
   let model_customizations =
     player_model_customization.from_int(model_customizations)
-  use #(main_hand, bit_array) <- result.try({
-    use #(main_hand, _) <- result.try(decoder.var_int(bit_array))
-    result.map(entity_handedness.from_int(main_hand), fn(hand) {
-      #(hand, bit_array)
-    })
-  })
+  use #(main_hand, bit_array) <- result.try(decoder.enum(
+    bit_array,
+    decoder.var_int,
+    entity_handedness.enum,
+  ))
   use #(text_filtering_enabled, bit_array) <- result.try(decoder.boolean(
     bit_array,
   ))
   use #(allows_listing, bit_array) <- result.try(decoder.boolean(bit_array))
-  use particle_status <- result.try({
-    use #(particle_status, _) <- result.try(decoder.var_int(bit_array))
-    particle_status.from_int(particle_status)
-  })
+  use #(particle_status, _) <- result.try(decoder.enum(
+    bit_array,
+    decoder.var_int,
+    particle_status.enum,
+  ))
   Ok(ServerboundClientInformation(
     locale,
     view_distance,
