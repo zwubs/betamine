@@ -8,7 +8,7 @@ import betamine/common/profile
 import betamine/common/rotation
 import betamine/common/uuid
 import betamine/constant
-import betamine/mojang
+import betamine/mojang/profile_cache
 import betamine/player/message
 import betamine/session/message as session_message
 import betamine/world/message as world_message
@@ -33,6 +33,7 @@ pub type Requiring {
     session_subject: session_message.Subject,
     world_subject: world_message.Subject,
     manager_subject: message.ManagerSubject,
+    profile_cache_subject: profile_cache.Subject,
   )
 }
 
@@ -54,10 +55,19 @@ type State {
 }
 
 pub fn start(requiring: Requiring) {
-  let Requiring(uuid:, session_subject:, world_subject:, manager_subject:) =
-    requiring
+  let Requiring(
+    uuid:,
+    session_subject:,
+    world_subject:,
+    manager_subject:,
+    profile_cache_subject:,
+  ) = requiring
   actor.new_with_initialiser(10_000, fn(subject) {
-    let assert Ok(profile) = mojang.fetch_profile(uuid)
+    let assert Ok(profile) =
+      process.call(profile_cache_subject, 5000, profile_cache.GetProfile(
+        _,
+        uuid,
+      ))
     let state: State =
       State(
         subject,

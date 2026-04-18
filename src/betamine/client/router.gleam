@@ -72,7 +72,9 @@ fn handle_handshake_packet(_state: State, packet: handshake_packet.Serverbound) 
 
 fn handle_status_packet(_state: State, packet: status_packet.Serverbound) {
   case packet {
-    status_packet.ServerboundStatusRequest -> Ok(phase.Status)
+    status_packet.ServerboundStatusRequest -> {
+      Ok(phase.Status)
+    }
     status_packet.ServerboundPingRequest(..) -> {
       Ok(phase.Status)
     }

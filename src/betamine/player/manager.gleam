@@ -1,5 +1,6 @@
 import betamine/common/profile
 import betamine/common/uuid
+import betamine/mojang/profile_cache
 import betamine/player/factory
 import betamine/player/message
 import betamine/player/player
@@ -35,6 +36,7 @@ type State {
     players: dict.Dict(uuid.Uuid, PlayerInstance),
     player_factory: factory.Supervisor,
     world_subject: world_message.Subject,
+    profile_cache_subject: profile_cache.Subject,
   )
 }
 
@@ -42,19 +44,30 @@ pub fn supervised(
   name: Name,
   factory_name: factory.Name,
   world_name: world_message.Name,
+  profile_cache_name: profile_cache.Name,
 ) -> supervision.ChildSpecification(Subject) {
-  supervision.worker(fn() { start(name, factory_name, world_name) })
+  supervision.worker(fn() {
+    start(name, factory_name, world_name, profile_cache_name)
+  })
 }
 
 pub fn start(
   name: Name,
   factory_name: factory.Name,
   world_name: world_message.Name,
+  profile_cache_name: profile_cache.Name,
 ) -> Result(actor.Started(Subject), actor.StartError) {
   let factory = factory_supervisor.get_by_name(factory_name)
   let world_subject = process.named_subject(world_name)
+  let profile_cache_subject = process.named_subject(profile_cache_name)
   actor.new_with_initialiser(1000, fn(subject) {
-    actor.initialised(State(subject, dict.new(), factory, world_subject))
+    actor.initialised(State(
+      subject,
+      dict.new(),
+      factory,
+      world_subject,
+      profile_cache_subject,
+    ))
     |> actor.selecting(process.select(process.new_selector(), subject))
     |> actor.returning(subject)
     |> Ok
@@ -75,6 +88,7 @@ fn handle_message(state: State, message: Message) {
             session_subject:,
             world_subject: state.world_subject,
             manager_subject: state.subject,
+            profile_cache_subject: state.profile_cache_subject,
           ),
         )
       {
