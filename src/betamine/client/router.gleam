@@ -10,6 +10,7 @@ import betamine/client/protocol/packet/play as play_packet
 import betamine/client/protocol/packet/status as status_packet
 import betamine/client/protocol/phase
 import betamine/client/protocol/types/intention
+import betamine/server/status_handler as server_status_handler
 import gleam/erlang/process
 import gleam/otp/actor
 import gleam/otp/supervision
@@ -24,16 +25,24 @@ pub type Name =
   process.Name(Message)
 
 type State {
-  State
+  State(server_status_handler_subject: server_status_handler.Subject)
 }
 
-pub fn supervised(name: Name) -> supervision.ChildSpecification(Subject) {
-  supervision.worker(fn() { start(name) })
+pub fn supervised(
+  name: Name,
+  server_status_handler_name: server_status_handler.Name,
+) -> supervision.ChildSpecification(Subject) {
+  supervision.worker(fn() { start(name, server_status_handler_name) })
 }
 
-pub fn start(name: Name) -> Result(actor.Started(Subject), actor.StartError) {
+pub fn start(
+  name: Name,
+  server_status_handler_name: server_status_handler.Name,
+) -> Result(actor.Started(Subject), actor.StartError) {
+  let server_status_handler_subject =
+    process.named_subject(server_status_handler_name)
   actor.new_with_initialiser(1000, fn(subject) {
-    actor.initialised(State)
+    actor.initialised(State(server_status_handler_subject:))
     |> actor.selecting(process.select(process.new_selector(), subject))
     |> actor.returning(subject)
     |> Ok

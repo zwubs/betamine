@@ -13,13 +13,13 @@ import gleam/otp/actor
 import gleam/otp/factory_supervisor
 import gleam/otp/supervision
 
-type Message =
+pub type Message =
   message.ManagerMessage
 
-type Subject =
+pub type Subject =
   message.ManagerSubject
 
-type Name =
+pub type Name =
   message.ManagerName
 
 type PlayerInstance {

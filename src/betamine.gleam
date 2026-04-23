@@ -4,6 +4,7 @@ import betamine/constant
 import betamine/entity_region/supervisor as entity_region_supervisor
 import betamine/mojang/profile_cache
 import betamine/player/supervisor as player_supervisor
+import betamine/server/status_handler as server_status_handler
 import betamine/world/world
 import gleam/erlang/process
 import gleam/int
@@ -33,8 +34,16 @@ pub fn main() {
       profile_cache_name,
     )
 
+  let server_status_handler_name = process.new_name("server_status_handler")
+  let server_status_handler =
+    server_status_handler.supervised(
+      server_status_handler_name,
+      player_manager_name,
+    )
+
   let client_router_name = process.new_name("client_router")
-  let client_router = client_router.supervised(client_router_name)
+  let client_router =
+    client_router.supervised(client_router_name, server_status_handler_name)
 
   let http_server =
     glisten.new(
@@ -51,6 +60,7 @@ pub fn main() {
     |> static_supervisor.add(world)
     |> static_supervisor.add(entity_region_supervisor)
     |> static_supervisor.add(player_supervisor)
+    |> static_supervisor.add(server_status_handler)
     |> static_supervisor.add(client_router)
     |> static_supervisor.add(http_server)
     |> static_supervisor.start()
